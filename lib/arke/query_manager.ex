@@ -833,7 +833,7 @@ defmodule Arke.QueryManager do
     do: {:ok, parameter, value}
 
   defp handle_link_parameters(arke, unit, current_unit \\ nil) do
-    old_data = if current_unit, do: [Map.put(current_unit, :id, unit.id)], else: nil
+    old_data = if current_unit, do: [Map.put(current_unit, :id, unit.id)], else: []
 
     case handle_bulk_link_parameters([unit], [], arke, old_data) do
       {:ok, [unit], []} -> {:ok, unit}
@@ -850,9 +850,11 @@ defmodule Arke.QueryManager do
   defp handle_bulk_link_parameters(
          [%{metadata: %{project: project}} | _] = valid,
          errors,
-         arke,
+         %{arke_id: arke_id} = unit,
          current_units \\ []
        ) do
+    arke = ArkeManager.get(arke_id, project)
+
     link_parameters =
       Enum.filter(ArkeManager.get_parameters(arke), fn p -> p.arke_id == :link end)
 
@@ -877,8 +879,8 @@ defmodule Arke.QueryManager do
   end
 
   defp build_link_entries(%{data: %{multiple: true}} = parameter, unit, old_value, new_value) do
-    {Enum.map(new_value, &update_link_entry(parameter, unit, &1)),
-     Enum.map(old_value, &update_link_entry(parameter, unit, &1))}
+    {Enum.map(new_value || [], &update_link_entry(parameter, unit, &1)),
+     Enum.map(old_value || [], &update_link_entry(parameter, unit, &1))}
   end
 
   defp build_link_entries(_parameter, _unit, old_value, new_value) when old_value == new_value,

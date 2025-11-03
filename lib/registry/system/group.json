@@ -1,14 +1,32 @@
-{ "group": [
-  {
-    "id": "parameter",
-    "label": "Parameter",
-    "description": "Parameter Group",
-    "arke_list": ["string","integer","float","list","dict","date","datetime","time","boolean","dynamic","link","binary"]
-  },
-  {
-    "id": "arke_or_group",
-    "label": "Arke or Group",
-    "description": "Arke or Group",
-    "arke_list": ["arke","group"]
-  }
-]}
+{
+  "group": [
+    {
+      "id": "parameter",
+      "label": "Parameter",
+      "description": "Parameter Group",
+      "arke_list": [
+        "string",
+        "integer",
+        "float",
+        "list",
+        "dict",
+        "date",
+        "datetime",
+        "time",
+        "boolean",
+        "dynamic",
+        "link",
+        "binary"
+      ]
+    },
+    {
+      "id": "arke_or_group",
+      "label": "Arke or Group",
+      "description": "Arke or Group",
+      "arke_list": [
+        "arke",
+        "group"
+      ]
+    }
+  ]
+}
