@@ -73,14 +73,16 @@ defmodule Arke.System do
 
         file_as_list = Xlsxir.get_list(ref)
 
-        header_file = Enum.at(file_as_list, 0)
+        file_header = Enum.at(file_as_list, 0)
         rows = file_as_list |> List.delete_at(0)
 
-        template_header = get_header_for_import(project, arke, header_file)
-        header = parse_header_for_import(template_header, header_file)
+        template_header = get_header_for_import(project, arke, file_header)
+        header = parse_header_for_import(template_header, file_header)
+        template_header_keys = MapSet.new(file_header)
+        file_header_keys = MapSet.new(file_header)
 
-        # used reverse to not add any breaking change
-        if Enum.reverse(header) == Enum.with_index(template_header) do
+        # used mapset in order to ignore all not used keys
+        if MapSet.subset?(template_header_keys, file_header_keys) do
           {correct_units, error_units} =
             Enum.with_index(rows)
             |> Enum.reduce({[], []}, fn {row, index}, {correct_units, error_units} ->
