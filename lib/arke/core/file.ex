@@ -18,6 +18,7 @@ defmodule Arke.Core.File do
   """
 
   use Arke.System
+  require Logger
 
   alias Arke.Boundary.ArkeManager
 
@@ -58,7 +59,7 @@ defmodule Arke.Core.File do
      {:ok, Map.put(data, :signed_url,signed_url )}
     else
       false -> {:ok, data}
-      {:error,msg} -> Logger.warn("error while loading the image: #{msg}")
+      {:error,msg} -> Logger.warning("error while loading the image: #{msg}")
                       {:ok,data}
     end
   end
