@@ -24,6 +24,7 @@ defmodule Arke.QueryManager do
 
   ## `operators`
     - eq => equal => `=`
+    - ieq => equal (Not case sensitive) => `TO_LOWER(column_value) = TO_LOWER(value)`
     - contains => contains a value (Case sensitive) =>  `LIKE %word%`
     - icontains => contains a value (Not case sensitive) => `LIKE %word%`
     - startswith => starts with the given value (Case sensitive) => `LIKE %word`
@@ -52,6 +53,7 @@ defmodule Arke.QueryManager do
   @type func_return() :: {:ok, Unit.t()} | Error.t()
   @type operator() ::
           :eq
+          | :ieq
           | :contains
           | :icontains
           | :startswith
