@@ -232,9 +232,10 @@ defmodule Mix.Tasks.Arke.SeedProject do
                 Map.merge(existing, map)
               end)
 
-            map, acc ->
-              # oggetti senza :id (opzionale)
-              Map.put(acc, make_ref(), map)
+            %{type: type, parent: parent, child: child} = map, acc ->
+              Map.update(acc, "#{type}_#{parent}_#{child}", map, fn existing ->
+                Map.merge(existing, map)
+              end)
           end)
           |> Map.values()
           |> then(&Map.put(acc, key, &1))
