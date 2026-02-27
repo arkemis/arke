@@ -37,6 +37,7 @@ defmodule Arke.System do
         unit.data.parameters
       end
 
+      def is_arke?(), do: nil
       def on_load(data, _persistence_fn), do: {:ok, data}
       def before_load(data, _persistence_fn), do: {:ok, data}
       def on_validate(arke, unit), do: {:ok, unit}
