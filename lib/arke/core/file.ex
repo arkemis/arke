@@ -106,15 +106,15 @@ defmodule Arke.Core.File do
   def get_url(unit), do: get_signed_url(unit)
 
   def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit) do
-    with %Arke.Core.Unit{runtime_data: runtime_data} = cached <-
+    with %{signed_url: _signed_url, expiration: _expiration} = cached <-
            FileManager.get(unit_id, project),
-         {:ok, result} <- valid_data?(runtime_data) do
+         {:ok, result} <- valid_data?(cached) do
       {:ok, result}
     else
       _ ->
         case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}") do
           {:ok, result} ->
-            FileManager.create(unit, result)
+            FileManager.add(unit, result)
             {:ok, result}
 
           {:error, msg} ->
