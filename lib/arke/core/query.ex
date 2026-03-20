@@ -51,11 +51,12 @@ defmodule Arke.Core.Query do
       - parameter => %Arke.Core.Parameter.`ParameterType` => refer to `Arke.Core.Parameter`
       - operator => refer to [operators](#module-operators)
       - value => any => the value that the query will search for
-      - negate => boolean => used to figure out whether the condition is to be denied \n
+      - negate => boolean => used to figure out whether the condition is to be denied
+      - path => [Arke.Core.Parameter.ParameterType] => the path of the parameter \n
       It is used to keep the same logic structure across all the Filter
     """
 
-    defstruct ~w[parameter operator value negate]a
+    defstruct ~w[parameter operator value negate path]a
     @type t() :: %Arke.Core.Query.BaseFilter{}
 
     @doc """
@@ -79,14 +80,16 @@ defmodule Arke.Core.Query do
             parameter :: Arke.Core.Parameter.ParameterType,
             operator :: atom(),
             value :: any,
-            negate :: boolean
+            negate :: boolean,
+            path :: [Arke.Core.Parameter.ParameterType]
           ) :: Arke.Core.Query.BaseFilter.t()
-    def new(parameter, operator, value, negate) do
+    def new(parameter, operator, value, negate, path) do
       %__MODULE__{
         parameter: parameter,
         operator: operator,
         value: cast_value(parameter, value),
-        negate: negate
+        negate: negate,
+        path: path
       }
     end
 
@@ -111,10 +114,11 @@ defmodule Arke.Core.Query do
     @moduledoc """
       Base struct Order:
       - parameter => %Arke.Core.Parameter.`ParameterType` => refer to `Arke.Core.Parameter`
-      - direction => "child" | "parent" => the direction the query will use to search \n
+      - direction => "child" | "parent" => the direction the query will use to search
+      - path => [Arke.Core.Parameter.ParameterType] => the path of the parameter \n
       It is used to define the return order of a Query
     """
-    defstruct ~w[parameter direction]a
+    defstruct ~w[parameter direction path]a
     @type t() :: %Arke.Core.Query.Order{}
   end
 
@@ -133,18 +137,19 @@ defmodule Arke.Core.Query do
       %Arke.Core.Query{}
 
   """
-  @spec new(arke :: %Arke.Core.Arke{}, project :: atom(), distinct :: atom()) :: Arke.Core.Query.t()
+  @spec new(arke :: %Arke.Core.Arke{}, project :: atom(), distinct :: atom()) ::
+          Arke.Core.Query.t()
   def new(arke, project, distinct \\ nil),
-      do: %__MODULE__{
-        project: project,
-        arke: arke,
-        distinct: distinct,
-        persistence: nil,
-        filters: [],
-        orders: [],
-        offset: nil,
-        limit: nil
-      }
+    do: %__MODULE__{
+      project: project,
+      arke: arke,
+      distinct: distinct,
+      persistence: nil,
+      filters: [],
+      orders: [],
+      offset: nil,
+      limit: nil
+    }
 
   @doc """
   Add a new link filter
@@ -216,8 +221,8 @@ defmodule Arke.Core.Query do
   ## Return
        %Arke.Core.Query{... filters: [ %Arke.Core.Query.Filter{} ] ... }
   """
-  def add_filter(query, parameter, operator, value, negate) do
-    %{query | filters: [new_filter(parameter, operator, value, negate) | query.filters]}
+  def add_filter(query, parameter, operator, value, negate, path \\ []) do
+    %{query | filters: [new_filter(parameter, operator, value, negate, path) | query.filters]}
   end
 
   @doc """
@@ -257,11 +262,11 @@ defmodule Arke.Core.Query do
   ## Return
       %Arke.Core.Query.Filter{base_filters: [ %Arke.Core.Query.BaseFilter{} ]}
   """
-  def new_filter(parameter, operator, value, negate) do
+  def new_filter(parameter, operator, value, negate, path \\ []) do
     %Filter{
       logic: :and,
       negate: false,
-      base_filters: [new_base_filter(parameter, operator, value, negate)]
+      base_filters: [new_base_filter(parameter, operator, value, negate, path)]
     }
   end
 
@@ -300,11 +305,13 @@ defmodule Arke.Core.Query do
       %Arke.Core.Query.BaseFilter{}
 
   """
+
   # TODO: standardize parameter
   #  if it is a string convert it to existing atom and get it from paramater manager
   #  if it is an atom get it from paramater manaager
-  def new_base_filter(parameter, operator, value, negate) do
-    BaseFilter.new(parameter, operator, value, negate)
+
+  def new_base_filter(parameter, operator, value, negate, path \\ []) do
+    BaseFilter.new(parameter, operator, value, negate, path)
   end
 
   defp parse_base_filters(base_filters) when is_list(base_filters), do: base_filters
@@ -327,10 +334,20 @@ defmodule Arke.Core.Query do
   ## Return
       %Arke.Core.Query{ ... orders: [ %Arke.Core.Query.Order{} ] ... }
   """
+
+  def add_order(query, parameter, direction) when is_list(parameter) do
+    {parameter, path} = List.pop_at(parameter, -1)
+
+    %{
+      query
+      | orders: [%Order{parameter: parameter, direction: direction, path: path} | query.orders]
+    }
+  end
+
   def add_order(query, parameter, direction) do
     %{
       query
-      | orders: [%Order{parameter: parameter, direction: direction} | query.orders]
+      | orders: [%Order{parameter: parameter, direction: direction, path: []} | query.orders]
     }
   end
 

@@ -238,7 +238,7 @@ defmodule Arke.Core.Unit do
       id: handle_id(unit.id),
       arke_id: Atom.to_string(unit.arke_id),
       data: encode_unit_data(arke, unit.data),
-      metadata: %{},
+      metadata: Map.get(unit, :metadata, %{}),
       inserted_at: NaiveDateTime.utc_now(),
       updated_at: NaiveDateTime.utc_now()
     ]
@@ -268,16 +268,6 @@ defmodule Arke.Core.Unit do
 
   defp update_encoded_unit_data(_, data, _), do: data
 
-  def as_args(arke, unit) do
-    [
-      id: handle_id(unit.id),
-      arke_id: Atom.to_string(unit.arke_id),
-      data: encode_unit_data(arke, unit.data),
-      metadata: %{},
-      inserted_at: NaiveDateTime.utc_now(),
-      updated_at: NaiveDateTime.utc_now()
-    ]
-  end
 
   defp handle_id(id) when is_nil(id), do: UUID.uuid1()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
@@ -407,7 +397,8 @@ defmodule Arke.Core.Unit do
     end
   end
 
-  defp parse_value(value, %{arke_id: :link, data: %{multiple: true}}) when is_binary(value) do
+  defp parse_value(value, %{arke_id: arke_id, data: %{multiple: true}})
+       when is_binary(value) and arke_id in [:link, :string] do
     cleaned_string = String.trim_leading(String.trim_trailing(value, "]"), "[")
     list_result = cleaned_string |> String.split(~r/,/, trim: true)
     cleaned_list = list_result |> Enum.map(&String.replace(&1, ~r/^['"]|['"]$/, ""))

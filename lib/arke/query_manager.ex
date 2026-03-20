@@ -42,6 +42,8 @@ defmodule Arke.QueryManager do
   alias Arke.LinkManager
   alias Arke.QueryManager
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
+  alias Arke.Errors.ArkeError
+  alias Arke.Utils.ErrorGenerator, as: Error
   alias Arke.Core.{Arke, Unit, Query, Parameter}
 
   @persistence Application.get_env(:arke, :persistence)
@@ -343,7 +345,17 @@ defmodule Arke.QueryManager do
   defp get_arke(arke, project) when is_binary(arke),
     do: String.to_existing_atom(arke) |> get_arke(project)
 
-  defp get_arke(arke, project) when is_atom(arke), do: ArkeManager.get(arke, project)
+  defp get_arke(arke, project) when is_atom(arke) do
+    case ArkeManager.get(arke, project) do
+      nil ->
+        {:error, msg} = Error.create(:query, "arke not found")
+        raise ArkeError, message: msg, type: :not_found
+
+      arke ->
+        arke
+    end
+  end
+
   defp get_arke(arke, _), do: arke
 
   defp get_group(group, project) when is_binary(group),
@@ -397,7 +409,7 @@ defmodule Arke.QueryManager do
   defp parse_base_filters(query, filters) do
     Enum.reduce(filters, [], fn f, new_filters ->
       parameter = get_parameter(query, f.parameter)
-      [Query.new_base_filter(parameter, f.operator, f.value, f.negate) | new_filters]
+      [Query.new_base_filter(parameter, f.operator, f.value, f.negate, f.path) | new_filters]
     end)
   end
 
@@ -420,10 +432,11 @@ defmodule Arke.QueryManager do
           parameter :: Arke.t() | atom(),
           negate :: boolean(),
           value :: String.t() | boolean() | nil,
-          negate :: boolean()
+          negate :: boolean(),
+          path :: [Arke.t()]
         ) :: Query.BaseFilter.t()
-  def condition(parameter, operator, value, negate \\ false),
-    do: Query.new_base_filter(parameter, operator, value, negate)
+  def condition(parameter, operator, value, negate \\ false, path \\ []),
+    do: Query.new_base_filter(parameter, operator, value, negate, path)
 
   @doc """
   Create a list of `Arke.Core.Query.BaseFilter`
@@ -535,8 +548,21 @@ defmodule Arke.QueryManager do
     handle_filter_group(query, group, arke_list, negate)
   end
 
-  defp handle_filter(query, parameter, operator, value, negate),
-    do: Query.add_filter(query, get_parameter(query, parameter), operator, value, negate)
+  # handles nested parameters (eg. link_parameter.parameter)
+  defp handle_filter(query, parameter, operator, value, negate) when is_binary(parameter) do
+    {parameter_id, path_ids} =
+      parameter
+      |> String.split(".")
+      |> List.pop_at(-1)
+
+    parameter = get_parameter(query, parameter_id)
+    path = get_path_parameters(query, path_ids)
+    Query.add_filter(query, parameter, operator, value, negate, path)
+  end
+
+  defp handle_filter(query, parameter, operator, value, negate) do
+    Query.add_filter(query, get_parameter(query, parameter), operator, value, negate)
+  end
 
   defp handle_filter_group(query, group, arke_list, negate) when is_nil(group), do: query
 
@@ -558,11 +584,24 @@ defmodule Arke.QueryManager do
   """
   @spec order(
           query :: Query.t(),
-          parameter :: Arke.t() | String.t() | atom(),
+          parameter :: Arke.t() | String.t() | atom() | [Arke.t()] | [String.t()] | [atom()],
           direction :: atom()
         ) :: Query.t()
+
+  def order(query, parameter, direction) when is_list(parameter) do
+    [head | tail] = parameter
+
+    parameters =
+      [get_parameter(query, head)] ++ get_path_parameters(query, tail)
+
+    Query.add_order(query, parameters, direction)
+  end
+
   def order(query, parameter, direction),
     do: Query.add_order(query, get_parameter(query, parameter), direction)
+
+  defp get_path_parameters(query, path),
+    do: Enum.map(path, &get_parameter(%{query | arke: nil}, &1))
 
   @doc """
   Set the offset of the  query

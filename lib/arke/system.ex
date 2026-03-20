@@ -58,7 +58,7 @@ defmodule Arke.System do
             %{runtime_data: %{conn: %{method: "POST"} = conn}, metadata: %{project: project}} =
               arke
           ) do
-        member = ArkeAuth.Guardian.Plug.current_resource(conn)
+        member = ArkeAuth.Guardian.get_member(conn)
         mode = Map.get(conn.body_params, "mode", "default")
 
         case Map.get(conn.body_params, "file", nil) do
@@ -73,61 +73,67 @@ defmodule Arke.System do
 
         file_as_list = Xlsxir.get_list(ref)
 
-        header_file = Enum.at(file_as_list, 0)
+        file_header = Enum.at(file_as_list, 0)
         rows = file_as_list |> List.delete_at(0)
 
-        header =
-          get_header_for_import(project, arke, header_file)
-          |> parse_haeder_for_import(header_file)
+        template_header = get_header_for_import(project, arke, file_header)
+        header = parse_header_for_import(template_header, file_header)
+        template_header_keys = MapSet.new(file_header)
+        file_header_keys = MapSet.new(file_header)
 
-        {correct_units, error_units} =
-          Enum.with_index(rows)
-          |> Enum.reduce({[], []}, fn {row, index}, {correct_units, error_units} ->
-            case Enum.filter(row, &(!is_nil(&1))) do
-              [] ->
-                {correct_units, error_units}
+        # used mapset in order to ignore all not used keys
+        if MapSet.subset?(template_header_keys, file_header_keys) do
+          {correct_units, error_units} =
+            Enum.with_index(rows)
+            |> Enum.reduce({[], []}, fn {row, index}, {correct_units, error_units} ->
+              case Enum.filter(row, &(!is_nil(&1))) do
+                [] ->
+                  {correct_units, error_units}
 
-              _ ->
-                case load_units(project, arke, header, row, all_units, mode) do
-                  {:error, args, errors} ->
-                    m =
-                      Enum.reduce(header, %{}, fn {h, index}, acc ->
-                        acc = Map.put(acc, h, parse_cell(Enum.at(row, index)))
-                      end)
-                      |> Map.put("errors", errors)
+                _ ->
+                  case load_units(project, arke, header, row, all_units, mode) do
+                    {:error, args, errors} ->
+                      m =
+                        Enum.reduce(header, %{}, fn {h, index}, acc ->
+                          acc = Map.put(acc, h, parse_cell(Enum.at(row, index)))
+                        end)
+                        |> Map.put("errors", errors)
 
-                    {correct_units, [m | error_units]}
+                      {correct_units, [m | error_units]}
 
-                  {:ok, unit_args} ->
-                    {[unit_args | correct_units], error_units}
-                end
-            end
-          end)
+                    {:ok, unit_args} ->
+                      {[unit_args | correct_units], error_units}
+                  end
+              end
+            end)
 
-        existing_units = get_existing_units_for_import(project, arke, header, correct_units)
+          existing_units = get_existing_units_for_import(project, arke, header, correct_units)
 
-        units_args =
-          Enum.filter(correct_units, fn u ->
-            check_existing_units_for_import(project, arke, header, u, existing_units) == false
-          end)
+          units_args =
+            Enum.filter(correct_units, fn u ->
+              check_existing_units_for_import(project, arke, header, u, existing_units) == false
+            end)
 
-        {existing_units, units_args, error_units} =
-          handle_insert(project, existing_units, units_args, error_units)
+          {existing_units, units_args, error_units} =
+            handle_insert(project, existing_units, units_args, error_units)
 
-        count_inserted = length(units_args)
-        count_existing = length(existing_units)
-        count_error = length(error_units)
-        total_count = count_inserted + count_error + count_existing
+          count_inserted = length(units_args)
+          count_existing = length(existing_units)
+          count_error = length(error_units)
+          total_count = count_inserted + count_error + count_existing
 
-        res = %{
-          count_inserted: count_inserted,
-          count_existing: count_existing,
-          count_error: count_error,
-          total_count: total_count,
-          error_units: error_units
-        }
+          res = %{
+            count_inserted: count_inserted,
+            count_existing: count_existing,
+            count_error: count_error,
+            total_count: total_count,
+            error_units: error_units
+          }
 
-        {:ok, res, 201}
+          {:ok, res, 201}
+        else
+          {:error, "header mismatch between template and the given file", 400}
+        end
       end
 
       defp handle_insert(project, existing_units, units_args, error_units)
@@ -157,21 +163,24 @@ defmodule Arke.System do
         end)
       end
 
-      defp parse_haeder_for_import(header, header_file) do
-        Enum.reduce(Enum.with_index(header_file), [], fn {cell, index}, acc ->
-          case cell do
-            nil ->
-              acc
+      defp parse_header_for_import(header, header_file) do
+        Enum.with_index(header_file)
+        |> Enum.reduce([], fn
+          {nil, _index}, acc ->
+            acc
 
-            "" ->
-              acc
+          {"", _index}, acc ->
+            acc
 
-            cell ->
-              case cell in header do
-                nil -> acc
-                parameter -> [{cell, index} | acc]
-              end
-          end
+          {cell, index}, acc ->
+            if Enum.member?(header, cell) do
+              [{cell, index} | acc]
+            else
+              acc
+            end
+
+          {_cell, _index}, acc ->
+            acc
         end)
       end
 

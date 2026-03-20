@@ -114,7 +114,6 @@ defmodule Arke.StructManager do
   defp handle_load_link(_, _, false, _opts), do: []
 
   defp handle_load_link(unit, project, true, opts) do
-
     get_link_id_list(unit)
     |> get_link_units(project, opts)
   end
@@ -262,7 +261,6 @@ defmodule Arke.StructManager do
   end
 
   def decode(_project, _arke_id, _json, _format), do: raise("Must pass valid data")
-
 
   defp handle_default_value(
          %{arke_id: :string, data: %{default_string: default_string}} = _,
@@ -515,18 +513,24 @@ defmodule Arke.StructManager do
     case ArkeManager.get(arke_or_group_id, project) do
       {:error, _} ->
         case GroupManager.get(arke_or_group_id, project) do
-          {:error, _} -> nil
-          group -> group
+          {:error, _} ->
+            nil
+
+          group ->
+            group
         end
 
       nil ->
         case GroupManager.get(arke_or_group_id, project) do
-          {:error, _} -> nil
-          group -> group
+          {:error, _} ->
+            nil
+
+          group ->
+            group
         end
 
       arke ->
-        arke
+        put_in(arke.data.parameters, get_struct(arke).parameters)
     end
   end
 

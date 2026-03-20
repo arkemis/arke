@@ -1,7 +1,7 @@
 defmodule Arke.MixProject do
   use Mix.Project
 
-  @version "0.3.14"
+  @version "0.4.5"
   @scm_url "https://github.com/arkemishub/arke"
   @site_url "https://arkehub.com"
 
@@ -61,7 +61,7 @@ defmodule Arke.MixProject do
       {:httpoison, "~> 2.0"},
       {:calendar, "~> 1.0.0"},
       {:xlsxir, "~> 1.6"},
-      {:libcluster, "~> 3.3"},
+      {:libcluster, "~> 3.3"}
     ]
   end
 
