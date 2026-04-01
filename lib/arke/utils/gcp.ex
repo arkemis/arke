@@ -24,6 +24,7 @@ defmodule Arke.Utils.Gcp do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
     optional_metadata = if opts[:public], do: [predefinedAcl: "publicread"], else: []
     conn = get_connection()
+
     {:ok, object} =
       GoogleApi.Storage.V1.Api.Objects.storage_objects_insert_iodata(
         conn,
@@ -34,7 +35,6 @@ defmodule Arke.Utils.Gcp do
         optional_metadata
       )
   end
-
 
   def get_file(file_path, opts \\ []) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
@@ -47,11 +47,12 @@ defmodule Arke.Utils.Gcp do
     )
   end
 
-  def get_public_url(%{data: %{name: name, path: path,extension: ext}}=unit,opts \\ []) do
+  def get_public_url(%{data: %{name: name, path: path, extension: ext}} = unit, opts \\ []) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    {:ok, "https://storage.googleapis.com/#{bucket}/#{path}/#{name}"}
+    {:ok, %{signed_url: "https://storage.googleapis.com/#{bucket}/#{path}/#{name}",expiration: nil}}
   end
-  def get_public_url(_unit,_opts), do: Error.create(:storage,"invalid unit")
+
+  def get_public_url(_unit, _opts), do: Error.create(:storage, "invalid unit")
 
   def delete_file(file_path, opts \\ []) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
@@ -78,9 +79,11 @@ defmodule Arke.Utils.Gcp do
     resource = "/#{bucket}/#{URI.encode(file_path)}"
     signature = ["GET", "", "", expires, resource] |> Enum.join("\n") |> Base.encode64()
     body = %{"payload" => signature} |> Poison.encode!()
+
     case HTTPoison.post(url, body, headers) do
       {:ok, %{status_code: 200, body: result}} ->
         %{"signedBlob" => signed_blob} = Poison.decode!(result)
+
         qs =
           %{
             "GoogleAccessId" => gcp_service_account,
@@ -89,12 +92,18 @@ defmodule Arke.Utils.Gcp do
           }
           |> URI.encode_query()
 
-        {:ok, Enum.join(["https://storage.googleapis.com#{resource}", "?", qs])}
-        {:ok,%{status_code: 403}=err} ->
-           {:error,"Forbidden resource"}
+        {:ok,
+         %{
+           signed_url: Enum.join(["https://storage.googleapis.com#{resource}", "?", qs]),
+           expiration: expires
+         }}
+
+      {:ok, %{status_code: 403} = err} ->
+        {:error, "Forbidden resource"}
+
       {:ok, e} ->
         IO.inspect(e)
-        {:error,"error on signed url"}
+        {:error, "error on signed url"}
     end
   end
 
@@ -102,5 +111,4 @@ defmodule Arke.Utils.Gcp do
     {:ok, token} = Goth.Token.fetch([])
     GoogleApi.Storage.V1.Connection.new(token.token)
   end
-
 end
