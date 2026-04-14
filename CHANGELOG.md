@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-14
+
+### Changed
+- Update_key which run jsonbset by @ErikFerrari in [#129](https://github.com/arkemis/arke/pull/129)
+- Nested logic operators by @ilyichv in [#131](https://github.com/arkemis/arke/pull/131)
+
+### New Contributors
+* @github-actions[bot] made their first contribution
+
 ## [0.5.0] - 2026-04-01
 
 ### Added
@@ -362,6 +371,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.6.0]: https://github.com/arkemis/arke/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/arkemis/arke/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/arkemis/arke/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/arkemis/arke/compare/v0.4.3...v0.4.4
