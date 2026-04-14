@@ -428,9 +428,13 @@ defmodule Arke.QueryManager do
   def or_(_query, _negate, filters), do: raise("filters must be a list")
 
   defp parse_base_filters(query, filters) do
-    Enum.reduce(filters, [], fn f, new_filters ->
-      parameter = get_parameter(query, f.parameter)
-      [Query.new_base_filter(parameter, f.operator, f.value, f.negate, f.path) | new_filters]
+    Enum.reduce(filters, [], fn
+      %Query.Filter{} = filter, new_filters ->
+        [filter | new_filters]
+
+      f, new_filters ->
+        parameter = get_parameter(query, f.parameter)
+        [Query.new_base_filter(parameter, f.operator, f.value, f.negate, f.path) | new_filters]
     end)
   end
 

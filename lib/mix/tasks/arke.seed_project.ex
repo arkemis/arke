@@ -224,7 +224,21 @@ defmodule Mix.Tasks.Arke.SeedProject do
      json = Jason.decode!(body, keys: :atoms)
       new_data =
         Enum.reduce(@decode_keys, %{}, fn key, acc ->
-          Map.put(acc, key, Map.get(data, key, []) ++ Map.get(json, key, []))
+          Map.get(data, key, [])
+          |> Enum.concat(Map.get(json, key, []))
+          |> Enum.reduce(%{}, fn
+            %{id: id} = map, acc ->
+              Map.update(acc, id, map, fn existing ->
+                Map.merge(existing, map)
+              end)
+
+            %{type: type, parent: parent, child: child} = map, acc ->
+              Map.update(acc, "#{type}_#{parent}_#{child}", map, fn existing ->
+                Map.merge(existing, map)
+              end)
+          end)
+          |> Map.values()
+          |> then(&Map.put(acc, key, &1))
         end)
       parse(t, format,new_data)
     rescue

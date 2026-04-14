@@ -19,11 +19,16 @@ defmodule Arke.Core.File do
 
   use Arke.System
 
-  alias Arke.Boundary.ArkeManager
+  alias Arke.Boundary.{ArkeManager, FileManager}
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
 
   arke id: :arke_file do
+  end
+
+  def on_delete(_arke, %{id: id, metadata: %{project: project}} = unit) do
+    FileManager.remove(id, project)
+    {:ok, unit}
   end
 
   def before_load(
@@ -35,8 +40,6 @@ defmodule Arke.Core.File do
     {:ok, binary} = File.read(path)
     path = "arke_file/#{DateTime.to_string(DateTime.utc_now())}"
 
-
-
     unit_data = %{
       binary_data: binary,
       extension: extension,
@@ -45,33 +48,43 @@ defmodule Arke.Core.File do
       path: path,
       name: filename
     }
+
     {:ok, unit_data}
   end
 
   def before_load(opts, _persistence_fn), do: {:ok, opts}
 
-  def on_struct_encode(arke, unit, data, opts) do
+  def on_struct_encode(arke, %{metadata: %{project: project}} = unit, data, opts) do
     load_files = Keyword.get(opts, :load_files, false)
 
     with true <- load_files,
-      {:ok,signed_url} <- get_url(unit) do
-     {:ok, Map.put(data, :signed_url,signed_url )}
+         {:ok, %{signed_url: signed_url} = opts} <- get_url(unit) do
+      data = Map.put(data, :signed_url, signed_url)
+      {:ok, Map.put(data, :signed_url, signed_url)}
     else
-      false -> {:ok, data}
-      {:error,msg} -> Logger.warn("error while loading the image: #{msg}")
-                      {:ok,data}
+      false ->
+        {:ok, data}
+
+      {:error, msg} ->
+        Logger.warn("error while loading the image: #{msg}")
+        {:ok, data}
     end
   end
 
-  def before_create(_, %{data: %{name: name, path: path, binary_data: binary},runtime_data: runtime_data} = unit) do
+  def before_create(
+        _,
+        %{data: %{name: name, path: path, binary_data: binary}, runtime_data: runtime_data} = unit
+      ) do
     is_public_file = is_public?(runtime_data)
-    new_unit =  Map.update(unit,:data, unit.data, fn udata -> Map.put(udata,:public,is_public_file) end)
-    case file_storage_module().upload_file("#{path}/#{name}", binary,public: is_public_file) do
+
+    new_unit =
+      Map.update(unit, :data, unit.data, fn udata -> Map.put(udata, :public, is_public_file) end)
+
+    case file_storage_module().upload_file("#{path}/#{name}", binary, public: is_public_file) do
       {:ok, _object} -> {:ok, new_unit}
       {:error, error} -> {:error, error}
     end
   end
-
 
   def before_delete(_, %{data: %{name: name, path: path}} = unit) do
     case file_storage_module().delete_file("#{path}/#{name}") do
@@ -89,15 +102,36 @@ defmodule Arke.Core.File do
     end
   end
 
-  def get_url(%{data: %{public: true}} = unit), do:  file_storage_module().get_public_url(unit)
+  def get_url(%{data: %{public: true}} = unit), do: file_storage_module().get_public_url(unit)
   def get_url(unit), do: get_signed_url(unit)
 
-  def get_signed_url(%{data: data} = unit) do
-    case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}") do
-    {:ok, signed_url} -> {:ok,signed_url}
-    {:error,msg} -> {:error,msg}
+  def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit) do
+    with %{signed_url: _signed_url, expiration: _expiration} = cached <-
+           FileManager.get(unit_id, project),
+         {:ok, result} <- valid_data?(cached) do
+      {:ok, result}
+    else
+      _ ->
+        case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}") do
+          {:ok, result} ->
+            FileManager.add(unit, result)
+            {:ok, result}
+
+          {:error, msg} ->
+            {:error, msg}
+        end
     end
   end
+
+  defp valid_data?(%{signed_url: signed_url, expiration: expiration} = _runtime_data) do
+    case DateTime.compare(DateTime.from_unix!(expiration), DateTime.utc_now()) do
+      :gt -> {:ok, %{signed_url: signed_url, expiration: expiration}}
+      _ -> {:error, "expired url"}
+    end
+  end
+
+  defp valid_data?(_runtime_data), do: {:error, "invalid data"}
+
   defp is_public?(%{link_parameter: %{data: %{public: true}}}), do: true
   defp is_public?(_runtime_data), do: false
 end
