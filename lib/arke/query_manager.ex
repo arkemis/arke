@@ -271,6 +271,27 @@ defmodule Arke.QueryManager do
          else: ({:error, errors} -> {:error, errors})
   end
 
+  def update_key(
+        %{arke_id: arke_id, metadata: %{project: project}, data: data} = current_unit,
+        args
+      ) do
+    persistence_fn = @persistence[:arke_postgres][:update_key]
+    arke = ArkeManager.get(arke_id, project)
+
+    with %Unit{} = unit <- Unit.update(current_unit, args),
+         {:ok, unit} <- update_at_on_update(unit),
+         {:ok, unit} <- Validator.validate(unit, :update, project),
+         {:ok, unit} <- ArkeManager.call_func(arke, :before_update, [arke, current_unit, unit]),
+         {:ok, unit} <- handle_group_call_func(arke, unit, :before_unit_update),
+         {:ok, unit} <- handle_link_parameters_unit(arke, unit),
+         {:ok, unit} <- persistence_fn.(current_unit, unit),
+         {:ok, unit} <- ArkeManager.call_func(arke, :on_update, [arke, current_unit, unit]),
+         {:ok, unit} <- handle_link_parameters(unit, data),
+         {:ok, unit} <- handle_group_call_func(arke, unit, :on_unit_update),
+         do: {:ok, unit},
+         else: ({:error, errors} -> {:error, errors})
+  end
+
   defp update_at_on_update(unit) do
     updated_at = DatetimeHandler.now(:datetime)
     {:ok, Unit.update(unit, updated_at: updated_at)}
