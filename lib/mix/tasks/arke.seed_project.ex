@@ -79,7 +79,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
         "Invalid persistence: `#{ps}`\nSupported persistence are: #{Enum.join(@persistence_repo, " | ")}"
       )
 
-  defp check_file(_arke_id, project, []), do: nil
+  defp check_file(_arke_id, _project, []), do: nil
 
   defp check_file(arke_id, project, data) do
     unless Mix.env() == :test do
@@ -300,22 +300,15 @@ defmodule Mix.Tasks.Arke.SeedProject do
     Mix.shell().info("--- Creating parameter #{id} --- ")
 
     with nil <- QueryManager.get_by(id: id, project: project, arke_id: type),
-         %Unit{} = model <- ArkeManager.get(String.to_atom(type), project),
+         {:ok, model} <- get_manager(:parameter, String.to_atom(type), project),
          {:ok, _unit} <- QueryManager.create(project, model, current) do
       handle_parameter(t, project, error)
     else
-      nil ->
-        handle_parameter(
-          t,
-          project,
-          parse_error(create_error(:parameter, "manager does not exists for: `#{id}`"), error)
-        )
-
       %Unit{} ->
         handle_parameter(
           t,
           project,
-          parse_error(create_error(:parameter, "Record already exists in db for: `#{id}`"), error)
+          parse_error(Error.create(:parameter, "Record already exists in db for: `#{id}`"), error)
         )
 
       {:error, err} ->
@@ -325,7 +318,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
         handle_parameter(
           t,
           project,
-          parse_error(create_error(:parameter, "Something went wrong for: `#{id}`"), error)
+          parse_error(Error.create(:parameter, "Something went wrong for: `#{id}`"), error)
         )
     end
   end
@@ -334,7 +327,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
     handle_parameter(
       t,
       project,
-      parse_error(create_error(:parameter, "Missing parameter `id` or `type`"), error)
+      parse_error(Error.create(:parameter, "Missing parameter `id` or `type`"), error)
     )
   end
 
@@ -353,7 +346,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
 
     # aggiungere try do block
     with nil <- QueryManager.get_by(id: id, project: project, arke_id: "arke"),
-         %Unit{} = model <- ArkeManager.get(:arke, project),
+         {:ok, model} <- get_manager(:arke, :arke, project),
          {:ok, unit} <- QueryManager.create(project, model, new_data),
          link_parameter_error <- link_parameter(parameter, unit, project) do
       if length(link_parameter_error) == 0 do
@@ -362,18 +355,14 @@ defmodule Mix.Tasks.Arke.SeedProject do
         handle_arke(t, project, [%{"#{id}_parameter_association": link_parameter_error} | error])
       end
     else
-      nil ->
-        handle_arke(
-          t,
-          project,
-          parse_error(create_error(:arke, "manager does not exists for: `#{id}`"), error)
-        )
-
       %Unit{} = _unit ->
+        Mix.shell().info("--- Updating parameters for arke #{id} --- ")
+        # remove old parameter
+        # add missing parameter
         handle_arke(
           t,
           project,
-          parse_error(create_error(:arke, "Record already exists in db for: `#{id}`"), error)
+          parse_error(Error.create(:arke, "Record already exists in db for: `#{id}`"), error)
         )
 
       {:error, err} ->
@@ -391,23 +380,18 @@ defmodule Mix.Tasks.Arke.SeedProject do
     Mix.shell().info("--- Creating group #{id} --- ")
 
     with nil <- QueryManager.get_by(id: id, project: project, arke_id: :group),
-         %Unit{} = model <- ArkeManager.get(:group, project),
+         {:ok, model} <- get_manager(:group, :group, project),
          {:ok, unit} <- QueryManager.create(project, model, current),
          error_group <- add_arke_to_group(unit, project) do
       handle_group(t, project, error ++ error_group)
     else
-      nil ->
-        handle_group(
-          t,
-          project,
-          parse_error(create_error(:arke, "manager does not exists for: `#{id}`"), error)
-        )
-
       %Unit{} = _unit ->
+        # remove old arke
+        # add missing arke
         handle_group(
           t,
           project,
-          parse_error(create_error(:arke, "Record already exists in db for: `#{id}`"), error)
+          parse_error(Error.create(:group, "Record already exists in db for: `#{id}`"), error)
         )
 
       {:error, err} ->
@@ -416,7 +400,6 @@ defmodule Mix.Tasks.Arke.SeedProject do
   end
 
   defp handle_group([], _project, error), do: error
-  defp handle_link(_data, _project, _error \\ [])
 
   defp handle_link(
          [%{type: type, parent: parent, child: child} = current | t],
@@ -449,7 +432,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
       handle_link(
         t,
         project,
-        parse_error(create_error(:link, "invalid parameters for #{current}}"), error)
+        parse_error(Error.create(:link, "invalid parameters for #{current}}"), error)
       )
 
   defp handle_link([], _project, error), do: error
@@ -493,16 +476,19 @@ defmodule Mix.Tasks.Arke.SeedProject do
     handle_link(group_link, project, [])
   end
 
-  defp create_error(context, msg) do
-    {:error, msg} = Error.create(context, msg)
-    msg
-  end
-
-  defp parse_error(error_message, error_accumulator) when is_list(error_message),
+  defp parse_error({:error, error_message}, error_accumulator) when is_list(error_message),
     do: error_message ++ error_accumulator
 
-  defp parse_error(error_message, error_accumulator), do: [error_message | error_accumulator]
+  defp parse_error({:error, error_message}, error_accumulator),
+    do: [error_message | error_accumulator]
 
-  defp parse_error(error_message, error_accumulator, id),
+  defp parse_error({:error, error_message}, error_accumulator, id),
     do: [%{create: id, error: error_message} | error_accumulator]
+
+  defp get_manager(context, id, project) do
+    case ArkeManager.get(id, project) do
+      %Unit{} = model -> {:ok, model}
+      nil -> Error.create(context, "manager does not exists for: `#{id}`")
+    end
+  end
 end
