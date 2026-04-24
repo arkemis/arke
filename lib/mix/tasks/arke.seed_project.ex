@@ -451,6 +451,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
          current_arke_model,
          parameter_list
        ) do
+         link_type = "parameter"
     current_linked_parameters =
       ArkeManager.get_parameters(current_arke_model)
       |> Enum.reduce([], fn
@@ -466,33 +467,37 @@ defmodule Mix.Tasks.Arke.SeedProject do
 
     parameter_to_remove =
       (current_linked_parameters -- right_parameter_list)
-      |> normalize_parameter_list(current_arke_model)
+      |> normalize_link_list(current_arke_model, link_type)
 
     ids_to_add = right_parameter_list -- current_linked_parameters
 
-    parameter_to_add = Enum.filter(parameter_list, &Enum.member?(ids_to_add, to_string(&1.id))) |> normalize_parameter_list(current_arke_model)
+    parameter_to_add = Enum.filter(parameter_list, &Enum.member?(ids_to_add, to_string(&1.id)))
+    |> normalize_link_list(current_arke_model,link_type)
 
-    Mix.shell().info("--- Adding parameters to arke #{current_arke_model.id} --- ")
+
     add_parameter_error = handle_link(parameter_to_add, current_arke_model, [], :add)
-    Mix.shell().info("--- Removing parameters from arke #{current_arke_model.id} --- ")
     delete_parameter_error = handle_link(parameter_to_remove, current_arke_model, [], :delete)
-
+    
+    add_parameter_error ++ delete_parameter_error
   end
 
-  defp normalize_parameter_list(p_list, %{id: parent_id} = arke_parent) do
-    Enum.map(p_list, fn parameter ->
-      {parameter_id, metadata} = get_parameter_data(parameter)
+  defp handle_group_members() do
+  end
+
+  defp normalize_link_list(link_list, %{id: parent_id} = arke_parent, type) do
+    Enum.map(link_list, fn child ->
+      {child_id, metadata} = get_link_data(child)
       %{
-        child: parameter_id,
+        child: child_id,
         parent: to_string(parent_id),
         metadata: metadata,
-        type: "parameter"
+        type: type
       }
     end)
   end
 
-  defp get_parameter_data(%{id: p_id} = parameter), do: {to_string(p_id), Map.get(parameter, :metadata, %{})}
-  defp get_parameter_data(parameter_id), do: {to_string(parameter_id), %{}}
+  defp get_link_data(%{id: child_id} = child), do: {to_string(child_id), Map.get(child, :metadata, %{})}
+  defp get_link_data(child_id), do: {to_string(child_id), %{}}
 
   defp add_arke_to_group(group, project) do
     Mix.shell().info("--- Adding arkes to group #{group.id} --- ")
