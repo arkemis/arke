@@ -374,14 +374,12 @@ defmodule Mix.Tasks.Arke.SeedProject do
          error
        ) do
     Mix.shell().info("--- Creating group #{id} --- ")
-    arke_association_error_msg = "#{id}_arke_association"
 
     # error means manager not found, create
     with {:error, _} <- get_manager(GroupManager, :group, String.to_atom(id), project),
          {:ok, model} <- get_manager(ArkeManager, :group, :group, project),
-         {:ok, unit} <- QueryManager.create(project, model, current),
-         error_group <- add_arke_to_group(unit, project) do
-      handle_group(t, project, error ++ error_group)
+         {:ok, unit} <- QueryManager.create(project, model, current) do
+      handle_group(t, project, error)
     else
       {:ok, %Unit{} = group_model} ->
         Mix.shell().info("--- Updating arkes for group #{id} --- ")
@@ -515,13 +513,6 @@ defmodule Mix.Tasks.Arke.SeedProject do
 
   defp get_link_data(child_id), do: {to_string(child_id), %{}}
 
-  defp add_arke_to_group(group, project) do
-    Mix.shell().info("--- Adding arkes to group #{group.id} --- ")
-    arke_list = Map.get(group, :arke_list, [])
-
-    normalize_link_list(arke_list, group, "group")
-    |> handle_link(project, [], :add)
-  end
 
   defp parse_error({:error, error_message}, error_accumulator) when is_list(error_message),
     do: error_message ++ error_accumulator
