@@ -178,9 +178,6 @@ defmodule Arke.System do
             else
               acc
             end
-
-          {_cell, _index}, acc ->
-            acc
         end)
       end
 
