@@ -1,6 +1,6 @@
 # Arke
 
-![Arke](https://github.com/arkemishub/arke/assets/81776297/7a04d11b-5cd0-4349-8621-d19cf0274585)
+![Arke](https://github.com/arkemis/arke/assets/81776297/7a04d11b-5cd0-4349-8621-d19cf0274585)
 
 ## Installation
 
@@ -18,4 +18,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/arke](https://hexdocs.pm/arke).
-
