@@ -56,7 +56,7 @@ defmodule Arke.MixProject do
       {:excoveralls, "~> 0.10", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:timex, "~> 3.7.11"},
-      {:google_api_storage, "~> 0.34.0"},
+      {:google_api_storage, "~> 0.46.1"},
       {:goth, "~> 1.3.0"},
       {:httpoison, "~> 2.0"},
       {:calendar, "~> 1.0.0"},
