@@ -1,11 +1,17 @@
 version: 2
 updates:
-  # Enable version updates for mix
   - package-ecosystem: "mix"
     directory: "/"
-    # Check for updates once a week
     schedule:
-      interval: "weekly"
-    # Allow up to 2 open pull requests for mix dependencies
-    open-pull-requests-limit: 2
+      interval: "monthly"
 
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    groups:
+      actions-deps:
+        patterns:
+          - "*"
+    schedule:
+      interval: "monthly"
