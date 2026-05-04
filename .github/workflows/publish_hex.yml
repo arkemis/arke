@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Elixir
@@ -18,7 +18,7 @@ jobs:
           elixir-version: '1.16.3'
           otp-version: '26.0'
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.5
         with:
           path: deps
           key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
@@ -42,7 +42,7 @@ jobs:
         env:
           GITHUB_REPO: ${{ github.repository }}
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body: ${{ steps.release_notes.outputs.content }}
       - name: Generate a changelog
