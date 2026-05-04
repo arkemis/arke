@@ -56,15 +56,6 @@ jobs:
           DB_NAME: test
           DB_USER: postgres
           DB_PASSWORD: postgres
-      - name: Upload to Codecov
-        if: ${{ matrix.coverage }}
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./cover/excoveralls.json
-          directory: cover
-          fail_ci_if_error: true
-          verbose: true
 
   hex_publish:
     name: Hex Publish
