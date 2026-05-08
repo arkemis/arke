@@ -345,7 +345,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
     parameter_error_msg = "#{id}_parameter_association"
 
     # error means manager not found, create
-    with {:error, _} <- get_manager(ArkeManager, :arke, String.to_atom(id), project),
+    with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
          {:ok, model} <- get_manager(ArkeManager, :arke, :arke, project),
          {:ok, unit} <- QueryManager.create(project, model, new_data),
          normalized_parameter <- normalize_link_list(parameter, unit, "parameter"),
@@ -354,7 +354,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
       parameter_errors = handle_list_errors(link_parameter_error, parameter_error_msg, error)
       handle_arke(t, project, parameter_errors)
     else
-      {:ok, %Unit{} = arke_model} ->
+     %Unit{} = arke_model ->
         Mix.shell().info("--- Updating parameters for arke #{id} --- ")
 
         handle_arke_parameters(arke_model, parameter)
@@ -376,12 +376,13 @@ defmodule Mix.Tasks.Arke.SeedProject do
     Mix.shell().info("--- Creating group #{id} --- ")
 
     # error means manager not found, create
-    with {:error, _} <- get_manager(GroupManager, :group, String.to_atom(id), project),
+    with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
          {:ok, model} <- get_manager(ArkeManager, :group, :group, project),
          {:ok, unit} <- QueryManager.create(project, model, current) do
+           IO.inspect(unit, label: "hellothere")
       handle_group(t, project, error)
     else
-      {:ok, %Unit{} = group_model} ->
+      %Unit{} = group_model ->
         Mix.shell().info("--- Updating arkes for group #{id} --- ")
         arke_list = current.arke_list
 
@@ -480,14 +481,14 @@ defmodule Mix.Tasks.Arke.SeedProject do
   end
 
   defp handle_group_members(%{metadata: %{project: project}} = current_group_model, arke_list) do
-    current_linked_arke = Enum.map(current_group_model.data.arke_list, &to_string(&1.id))
-    arke_to_remove_ids = current_linked_arke -- arke_list
-    arke_to_add_ids = arke_list -- current_linked_arke
+
+    arke_to_remove_ids = current_group_model.data.arke_list -- arke_list
+    arke_to_add_ids = arke_list -- current_group_model.data.arke_list
 
     # every group has a `arke_list` field that stores the arke ids it contains.
     # Must be updated and the link will be handled automatically
     complete_arke_list =
-      ((current_linked_arke -- arke_to_remove_ids) ++ arke_to_add_ids) |> Enum.uniq()
+      ((current_group_model.data.arke_list -- arke_to_remove_ids) ++ arke_to_add_ids) |> Enum.uniq()
 
     QueryManager.get_by(project: project, id: current_group_model.id)
     |> QueryManager.update(arke_list: complete_arke_list)
