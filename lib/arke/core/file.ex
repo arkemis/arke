@@ -56,18 +56,19 @@ defmodule Arke.Core.File do
 
   def on_struct_encode(arke, %{metadata: %{project: project}} = unit, data, opts) do
     load_files = Keyword.get(opts, :load_files, false)
+    clean_data = Map.delete(data, :binary_data)
 
     with true <- load_files,
          {:ok, %{signed_url: signed_url} = opts} <- get_url(unit) do
-      data = Map.put(data, :signed_url, signed_url)
-      {:ok, Map.put(data, :signed_url, signed_url)}
+      clean_data = Map.put(clean_data, :signed_url, signed_url)
+      {:ok, Map.put(clean_data, :signed_url, signed_url)}
     else
       false ->
-        {:ok, data}
+        {:ok, clean_data}
 
       {:error, msg} ->
         Logger.warn("error while loading the image: #{msg}")
-        {:ok, data}
+        {:ok, clean_data}
     end
   end
 
@@ -81,9 +82,7 @@ defmodule Arke.Core.File do
       Map.update(unit, :data, unit.data, fn udata -> Map.put(udata, :public, is_public_file) end)
 
     case file_storage_module().upload_file("#{path}/#{name}", binary, public: is_public_file) do
-      {:ok, _object} ->
-        clean_unit = Map.update(new_unit, :data, new_unit.data, fn udata -> Map.delete(udata, :binary_data) end)
-        {:ok, clean_unit}
+      {:ok, _object} -> {:ok, new_unit}
       {:error, error} -> {:error, error}
     end
   end
@@ -99,9 +98,7 @@ defmodule Arke.Core.File do
 
   def before_update(_, %{data: %{name: name, path: path, binary_data: binary}} = unit) do
     case file_storage_module().upload_file("#{path}/#{name}", binary) do
-      {:ok, _object} ->
-        clean_unit = Map.update(unit, :data, unit.data, fn udata -> Map.delete(udata, :binary_data) end)
-        {:ok, clean_unit}
+      {:ok, _object} -> {:ok, unit}
       {:error, error} -> {:error, error}
     end
   end
