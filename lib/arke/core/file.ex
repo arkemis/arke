@@ -81,7 +81,9 @@ defmodule Arke.Core.File do
       Map.update(unit, :data, unit.data, fn udata -> Map.put(udata, :public, is_public_file) end)
 
     case file_storage_module().upload_file("#{path}/#{name}", binary, public: is_public_file) do
-      {:ok, _object} -> {:ok, new_unit}
+      {:ok, _object} ->
+        clean_unit = Map.update(new_unit, :data, new_unit.data, fn udata -> Map.delete(udata, :binary_data) end)
+        {:ok, clean_unit}
       {:error, error} -> {:error, error}
     end
   end
@@ -97,7 +99,9 @@ defmodule Arke.Core.File do
 
   def before_update(_, %{data: %{name: name, path: path, binary_data: binary}} = unit) do
     case file_storage_module().upload_file("#{path}/#{name}", binary) do
-      {:ok, _object} -> {:ok, unit}
+      {:ok, _object} ->
+        clean_unit = Map.update(unit, :data, unit.data, fn udata -> Map.delete(udata, :binary_data) end)
+        {:ok, clean_unit}
       {:error, error} -> {:error, error}
     end
   end
