@@ -379,7 +379,6 @@ defmodule Mix.Tasks.Arke.SeedProject do
     with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
          {:ok, model} <- get_manager(ArkeManager, :group, :group, project),
          {:ok, unit} <- QueryManager.create(project, model, current) do
-           IO.inspect(unit, label: "hellothere")
       handle_group(t, project, error)
     else
       %Unit{} = group_model ->
