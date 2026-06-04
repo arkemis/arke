@@ -31,6 +31,8 @@ jobs:
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Restore deps and _build cache
         uses: actions/cache@v5
         with:
@@ -73,6 +75,8 @@ jobs:
         with:
           elixir-version: "1.18.4"
           otp-version: "26.2.5"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Restore dependencies cache
         uses: actions/cache@v5
         with:

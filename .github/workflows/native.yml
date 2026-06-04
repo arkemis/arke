@@ -1,0 +1,32 @@
+name: Native (Rust NIF)
+on:
+  push:
+    branches: [main]
+    paths: ["native/**", ".github/workflows/native.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["native/**", ".github/workflows/native.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lint-and-test:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native/arke_native
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/arke_native
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        run: cargo test
