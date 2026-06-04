@@ -28,3 +28,7 @@ arke-*.tar
 .elixir_ls/
 .idea/
 .idea
+
+# Rust NIF build artifacts
+native/*/target/
+priv/native/

@@ -1,7 +1,7 @@
 defmodule Arke.MixProject do
   use Mix.Project
 
-  @version "0.6.1"
+  @version "0.6.2"
   @scm_url "https://github.com/arkemis/arke"
   @site_url "https://arkehub.com"
 
@@ -52,10 +52,11 @@ defmodule Arke.MixProject do
     [
       {:typed_struct, "~> 0.2.1"},
       {:uuid, "~> 1.1"},
+      {:rustler_precompiled, "~> 0.8"},
+      {:rustler, "~> 0.34.0", optional: true},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
-      {:timex, "~> 3.7.11"},
       {:google_api_storage, "~> 0.34.0"},
       {:goth, "~> 1.4.5"},
       {:httpoison, "~> 2.0"},

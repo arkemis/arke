@@ -1,0 +1,16 @@
+[package]
+name = "arke_native"
+version = "0.1.0"
+edition = "2021"
+authors = []
+license = "Apache-2.0"
+description = "Rust NIFs for the Arke core (datetime parsing PoC)"
+
+[lib]
+name = "arke_native"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+rustler = "0.34"
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
