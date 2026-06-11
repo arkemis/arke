@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-06-11
+
+### Changed
+- Bump the actions-deps group across 1 directory with 3 updates by @dependabot[bot] in [#141](https://github.com/arkemis/arke/pull/141)
+- Bump credo from 1.7.17 to 1.7.18 by @dependabot[bot] in [#137](https://github.com/arkemis/arke/pull/137)
+- Bump goth from 1.3.1 to 1.4.5 by @dependabot[bot] in [#138](https://github.com/arkemis/arke/pull/138)
+- Matrix checks by @ilyichv in [#139](https://github.com/arkemis/arke/pull/139)
+- Configure dependabot by @ilyichv
+
+### Fixed
+- Update registry by @ErikFerrari in [#133](https://github.com/arkemis/arke/pull/133)
+- Fix legacy arkemishub links by @ilyichv
+
+### Removed
+- Remove codecov by @ilyichv
+
+### New Contributors
+* @dependabot[bot] made their first contribution in [#141](https://github.com/arkemis/arke/pull/141)
+
 ## [0.6.1] - 2026-04-30
 
 ### Removed
@@ -376,6 +395,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.6.2]: https://github.com/arkemis/arke/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/arkemis/arke/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/arkemis/arke/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/arkemis/arke/compare/v0.4.5...v0.5.0
