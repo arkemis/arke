@@ -543,11 +543,14 @@ defmodule Arke.System.BaseParameter do
   defp __check_map__(values), do: values
 
   defp __create_map_values__(values, opts, type, condition) do
+    keep = Keyword.get(opts, :keep_values_formatting, false)
     # FARE RAISE ECCEZIONE DA GESTIRE. CHIAVI DEVONO ESSERE TUTTE UGUALI
     with true <- Enum.all?(values, fn %{label: l, value: v} -> condition.(l, v) end) do
       new_values =
         Enum.map(values, fn k ->
-          %{label: String.capitalize(to_string(k.label)), value: __get_map_value__(k.value, type)}
+          label = to_string(k.label)
+          label = if keep, do: label, else: String.capitalize(label)
+          %{label: label, value: __get_map_value__(k.value, type)}
         end)
 
       __create_index__(opts, new_values)
@@ -560,10 +563,15 @@ defmodule Arke.System.BaseParameter do
   defp __get_map_value__(value, _), do: value
 
   defp __values_from_list__(values, opts, condition) do
+    keep = Keyword.get(opts, :keep_values_formatting, false)
     # FARE RAISE ECCEZIONE DA GESTIRE. CHIAVI DEVONO ESSERE TUTTE UGUALI
     with true <- Enum.all?(values, &condition.(&1)) do
       new_values =
-        Enum.map(values, fn k -> %{label: String.capitalize(to_string(k)), value: k} end)
+        Enum.map(values, fn k ->
+          label = to_string(k)
+          label = if keep, do: label, else: String.capitalize(label)
+          %{label: label, value: k}
+        end)
 
       __create_index__(opts, new_values)
     else
