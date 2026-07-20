@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-07-20
+
+### Added
+- Add keep_values_formatting for values of parameter by @vittorio-reinaudo in [#145](https://github.com/arkemis/arke/pull/145)
+
+### Changed
+- Bump the actions-deps group across 1 directory with 2 updates by @dependabot[bot] in [#144](https://github.com/arkemis/arke/pull/144)
+
 ## [0.6.2] - 2026-06-11
 
 ### Changed
@@ -395,6 +403,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.6.3]: https://github.com/arkemis/arke/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/arkemis/arke/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/arkemis/arke/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/arkemis/arke/compare/v0.5.0...v0.6.0
