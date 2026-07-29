@@ -87,7 +87,7 @@ defmodule Arke.MixProject do
     [
       # This option is only needed when you don't want to use the OTP application name
       name: "arke",
-      # These are the default files included in the package
+      files: ~w(lib mix.exs README* LICENSE* CHANGELOG* usage-rules.md usage-rules),
       licenses: ["Apache-2.0"],
       links: %{
         "Website" => @site_url,
