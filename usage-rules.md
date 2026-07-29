@@ -6,9 +6,10 @@ Arke is the core of the Arke framework: a metadata-driven, multi-tenant entity
 framework for Elixir where domain models ("Arkes") are runtime data rather than
 compile-time Ecto schemas. Every persisted thing — a record, a schema
 definition, a field type, a group, a graph edge — is an `Arke.Core.Unit` with
-the same struct shape, keyed by a project (tenant). Schemas are declared with
-the `Arke.System` macro DSL and/or JSON registry files, live in ETS behind
-GenServer managers, and all CRUD flows through `Arke.QueryManager`, which runs
+the same struct shape, keyed by a project (tenant). Schemas are defined in
+JSON registry files (the source of truth), while `Arke.System` modules attach
+behavior hooks to them by id; loaded schemas live in ETS behind GenServer
+managers, and all CRUD flows through `Arke.QueryManager`, which runs
 a validation + lifecycle-hook pipeline and delegates I/O to an injected
 persistence layer (usually `arke_postgres`) — core Arke performs no I/O itself.
 

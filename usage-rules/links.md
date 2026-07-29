@@ -4,18 +4,15 @@
   creates/deletes the underlying `arke_link` rows automatically:
 
   ```elixir
-  arke id: :invoice do
-    parameter :customer, :link,
-      arke_or_group_id: "person",          # must be an ARKE id — a Group id silently no-ops
-      connection_type: "invoice_customer",
-      direction: "parent",                 # "parent" => person is parent of invoice
-      multiple: false
-  end
+  # in the registry JSON, a parameter of type "link" with metadata:
+  # {"arke_or_group_id": "person", "connection_type": "invoice_customer",
+  #  "direction": "parent", "multiple": false}
 
   {:ok, inv} = QueryManager.create(:p, invoice_arke, number: "INV-001", customer: "ada")
   {:ok, _}   = QueryManager.update(inv, customer: "grace")  # old link deleted, new created
   ```
 
+  `arke_or_group_id` must be an ARKE id — a Group id silently no-ops.
 - `direction` semantics are easy to invert: `direction: "child"` means the
   unit being created is the PARENT and the referenced id the child;
   `direction: "parent"` means the referenced id is the parent.

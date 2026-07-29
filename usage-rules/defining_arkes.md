@@ -1,18 +1,27 @@
 # Defining Arkes
 
-- Declare an Arke with the `Arke.System` DSL:
+- The registry JSON is the source of truth for schema. Define an Arke and its
+  parameters there (e.g. `lib/registry/shared/arke.json` in your app), then
+  seed the project:
+
+  ```json
+  {"arke": [{"id": "person", "label": "Person",
+    "parameters": [
+      {"id": "name",  "metadata": {"required": true, "min_length": 2, "unique": true}},
+      {"id": "email", "metadata": {"required": true}},
+      {"id": "age",   "metadata": {"min": 0, "max": 150}}
+    ]}]}
+  ```
+
+- The Elixir module carries only BEHAVIOR (lifecycle hooks), bound to the
+  loaded Arke by id match:
 
   ```elixir
   defmodule MyApp.Person do
     use Arke.System
     alias Arke.Core.Unit
 
-    arke id: :person, label: "Person" do
-      parameter :name,  :string,  required: true, min_length: 2, unique: true
-      parameter :email, :string,  required: true
-      parameter :age,   :integer, min: 0, max: 150
-      parameter :role,  :string,  values: ["admin", "user", "guest"], default_string: "user"
-      parameter :bio,   :dict,    default_dict: %{}
+    arke id: :person do
     end
 
     def before_create(_arke, unit),
@@ -20,18 +29,17 @@
   end
   ```
 
-- The module alone is inert: you MUST also register the Arke in a registry
-  JSON (e.g. `lib/registry/shared/arke.json` in your app) and seed the
-  project, or have the Arke in the DB. The module is bound to the loaded Arke
-  by id match:
-
-  ```json
-  {"arke": [{"id": "person", "label": "Person",
-    "parameters": [{"id": "name", "metadata": {"required": true, "min_length": 2, "unique": true}}]}]}
-  ```
-
-- When the same id exists both in code and registry/DB, the registry/DB
-  definition wins for data; the module contributes only hooks.
+- **Avoid declaring parameters with the `parameter` macro inside
+  `arke do ... end`.** There is no sync mechanism between macro declarations
+  and the registry: when the Arke is loaded from registry/DB (the only way it
+  becomes live), the registry definition wins and the macro's parameter list
+  is ignored. Declaring parameters in both places means maintaining two
+  schema definitions that silently diverge — keep the macro block empty and
+  the schema in JSON.
+- The module alone is inert: `use Arke.System` registers nothing. Arkes
+  become live only when loaded from registry JSON (`mix arke.seed_project`)
+  or from the DB at boot. A module without a matching registry/DB entry never
+  fires its hooks.
 - Lifecycle hooks on the Arke module: `before_load/2`, `on_load/2`,
   `before_validate/2`, `on_validate/2`, `before_create/2`, `on_create/2`,
   `before_update/3`, `on_update/3`, `before_delete/2`, `on_delete/2`,
