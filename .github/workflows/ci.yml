@@ -23,7 +23,6 @@ jobs:
             otp: "26.2.5"
           - elixir: "1.18.4"
             otp: "26.2.5"
-            coverage: true
     steps:
       - uses: actions/checkout@v7
       - name: Set up Elixir
@@ -47,7 +46,7 @@ jobs:
       - name: Build package
         run: mix hex.build
       - name: Run tests
-        run: mix coveralls.json
+        run: mix test
 
   hex_publish:
     name: Hex Publish
