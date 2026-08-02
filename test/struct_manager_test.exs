@@ -1,5 +1,5 @@
 defmodule StructManagerTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   @base_keys [:id, :arke_id, :inserted_at, :updated_at, :metadata]
 
@@ -175,7 +175,7 @@ defmodule StructManagerTest do
       struct_dt = StructManager.decode(:test_schema, :test_arke_struct, values, :json)
 
       assert struct_dt.data.datetime_struct_test ==
-               "must be %DateTime | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
+               "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
     end
 
     test "get_struct" do

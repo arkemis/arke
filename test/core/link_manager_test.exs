@@ -1,5 +1,5 @@
 defmodule Arke.Core.LinkManagerTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   defp create_units(_) do
     arke_model = ArkeManager.get(:arke, :arke_system)

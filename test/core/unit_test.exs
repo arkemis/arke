@@ -1,5 +1,5 @@
 defmodule Arke.Core.UnitTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   describe "Unit" do
     test "new" do
@@ -14,15 +14,13 @@ defmodule Arke.Core.UnitTest do
       unit_bin =
         Unit.new(:unit_test_id, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__)
 
-      #
-      unit_nil = Unit.new(12, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__)
-
       assert unit.id == :unit_test_id
       assert unit.arke_id == :arke
       assert unit_bin.id == :unit_test_id
       assert unit_bin.arke_id == :arke
-      assert unit_nil.id == nil
-      assert unit_nil.arke_id == :arke
+
+      assert Unit.new(12, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__) ==
+               {:error, [%{context: "parameter_validation", message: "id cannot be a number"}]}
     end
 
     test "load" do

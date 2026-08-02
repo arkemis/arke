@@ -1,5 +1,5 @@
 defmodule Arke.Boundary.ArkeTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   describe "ArkeManager" do
     test "get_all/0" do
@@ -17,15 +17,14 @@ defmodule Arke.Boundary.ArkeTest do
     end
 
     test "get/2 (error)" do
-      {:error, msg} = ArkeManager.get(:not_valid, :arke_system)
-      assert String.downcase(List.first(msg)[:message]) == "unit with id 'not_valid' not found"
+      assert ArkeManager.get(:not_valid, :arke_system) == nil
     end
 
     test "create/1 " do
       data = [id: "arke_test", label: "Arke test"]
       arke = ArkeManager.get(:arke, :arke_system)
       unit = Unit.load(arke, data)
-      {:ok, _pid} = ArkeManager.create(unit)
+      assert %Arke.Core.Unit{} = ArkeManager.create(unit)
 
       assert %Arke.Core.Unit{} = ArkeManager.get(:arke_test, :arke_system)
     end
@@ -34,13 +33,10 @@ defmodule Arke.Boundary.ArkeTest do
       data = [id: :arke_test_create, label: "Arke test"]
       arke = ArkeManager.get(:arke, :arke_system)
       unit = Unit.load(arke, data)
-      {:ok, _pid} = ArkeManager.create(unit, :another_project)
-      {:error, msg} = ArkeManager.get(:not_exist, :arke_system)
+      assert %Arke.Core.Unit{} = ArkeManager.create(unit, :another_project)
 
       assert %Arke.Core.Unit{} = ArkeManager.get(:arke_test_create, :another_project)
-
-      assert String.downcase(List.first(msg)[:message]) ==
-               "unit with id 'not_exist' not found"
+      assert ArkeManager.get(:not_exist, :arke_system) == nil
     end
 
     test "get_parameters/0" do
