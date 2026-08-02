@@ -70,6 +70,7 @@ defmodule Arke.Core.Link do
 
   def on_update(
         _,
+        _old_unit,
         %{
           data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
           metadata: %{project: project} = metadata
@@ -78,6 +79,8 @@ defmodule Arke.Core.Link do
     ArkeManager.update_parameter(parent_id, child_id, project, metadata)
     {:ok, unit}
   end
+
+  def on_update(_, _old_unit, unit), do: {:ok, unit}
 
   def on_delete(
         _,

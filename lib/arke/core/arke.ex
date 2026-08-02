@@ -31,19 +31,7 @@ defmodule Arke.Core.Arke do
     {:ok, unit}
   end
 
-  def on_update(_, %{id: id, metadata: %{project: project}} = unit) do
-    ArkeManager.update(id, project, unit)
-    {:ok, unit}
-  end
-
-  def on_update(_, %{id: id, metadata: %{project: project}, data: data} = unit) do
-    parameters =
-      Enum.reduce(data.parameters, [], fn a, new_parameters ->
-        [handle_link_init(a, :parameters) | new_parameters]
-      end)
-
-    unit = Unit.update(unit, %{parameters: parameters})
-
+  def on_update(_, _old_unit, %{id: id, metadata: %{project: project}} = unit) do
     ArkeManager.update(id, project, unit)
     {:ok, unit}
   end

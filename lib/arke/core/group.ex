@@ -30,7 +30,7 @@ defmodule Arke.Core.Group do
     {:ok, unit}
   end
 
-  def on_update(_, %{id: id, metadata: %{project: project}, data: data} = unit) do
+  def on_update(_, _old_unit, %{id: id, metadata: %{project: project}, data: data} = unit) do
     arke_list =
       Enum.reduce(data.arke_list, [], fn a, new_arke_list ->
         [handle_link_init(a, :arke_list) | new_arke_list]

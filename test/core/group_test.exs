@@ -16,6 +16,18 @@ defmodule Arke.Core.GroupTest do
       assert after_create.id == :group_test
     end
 
+    test "update" do
+      group_model = ArkeManager.get(:group, :arke_system)
+
+      QueryManager.create(:test_schema, group_model, %{id: "group_test_edit", name: "group_test"})
+      before_update = GroupManager.get(:group_test_edit, :test_schema)
+      QueryManager.update(before_update, %{label: "edit_label"})
+      updated_group = GroupManager.get(:group_test_edit, :test_schema)
+
+      assert before_update.data.label == nil
+      assert updated_group.data.label == "edit_label"
+    end
+
     test "delete" do
       group_model = ArkeManager.get(:group, :arke_system)
 
