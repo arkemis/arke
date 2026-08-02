@@ -93,21 +93,58 @@ defmodule Arke.Core.Query do
       }
     end
 
-    defp cast_value(%Arke.Core.Unit{arke_id: arke_id} = parameter, value) do
-      case arke_id do
-        :datetime ->
-          Arke.Utils.DatetimeHandler.parse_datetime(value)
-          |> case do
-            {:ok, value} -> value
-            _ -> raise ArgumentError, message: "Invalid datetime format"
-          end
+    defp cast_value(_parameter, nil), do: nil
 
-        _ ->
-          value
+    defp cast_value(%Arke.Core.Unit{} = parameter, value) when is_list(value),
+      do: Enum.map(value, &cast_value(parameter, &1))
+
+    defp cast_value(%Arke.Core.Unit{arke_id: arke_id} = _parameter, value) do
+      case arke_id do
+        :datetime -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_datetime/1, value, "datetime")
+        :date -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_date/1, value, "date")
+        :time -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_time/1, value, "time")
+        :integer -> cast_integer(value)
+        :float -> cast_float(value)
+        :boolean -> cast_boolean(value)
+        _ -> value
       end
     end
 
-    defp cast_value(parameter, value), do: value
+    defp cast_value(_parameter, value), do: value
+
+    defp cast_temporal(parser, value, type) do
+      case parser.(value) do
+        {:ok, parsed} -> parsed
+        _ -> raise ArgumentError, message: "Invalid #{type} format"
+      end
+    end
+
+    defp cast_integer(value) when is_number(value), do: value
+
+    defp cast_integer(value) when is_binary(value) do
+      case Integer.parse(value) do
+        {parsed, _remainder} -> parsed
+        :error -> raise ArgumentError, message: "Invalid integer format"
+      end
+    end
+
+    defp cast_integer(value), do: value
+
+    defp cast_float(value) when is_number(value), do: value
+
+    defp cast_float(value) when is_binary(value) do
+      case Float.parse(value) do
+        {parsed, _remainder} -> parsed
+        :error -> raise ArgumentError, message: "Invalid float format"
+      end
+    end
+
+    defp cast_float(value), do: value
+
+    defp cast_boolean(value) when is_boolean(value), do: value
+    defp cast_boolean(value) when value in ["true", "True", 1, "1"], do: true
+    defp cast_boolean(value) when value in ["false", "False", 0, "0"], do: false
+    defp cast_boolean(_value), do: raise(ArgumentError, message: "Invalid boolean format")
   end
 
   defmodule Order do
