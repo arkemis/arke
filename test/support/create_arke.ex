@@ -1,4 +1,4 @@
-defmodule Arke.Support.CreateArke do
+defmodule Arke.Test.CreateArke do
   use Arke.System
   alias Arke.Validator
   alias Arke.Core.Unit
@@ -39,6 +39,15 @@ defmodule Arke.Support.CreateArke do
     parameter(:date_support, :date, default_date: ~D[1999-11-08])
     parameter(:datetime_support, :datetime, default_datetime: ~U[1999-11-08 09:55:13.416444Z])
     parameter(:time_support, :time, default_time: ~T[09:55:13.416444])
+  end
+
+  def support_arke() do
+    %{id: id} = attr = arke_from_attr()
+    [] = Arke.handle_manager([Map.update!(attr, :id, &to_string/1)], :arke_system, :arke)
+
+    Enum.each(groups_from_attr(), fn %{id: parent_id, metadata: link_metadata} ->
+      GroupManager.add_link(parent_id, :arke_system, :arke_list, id, link_metadata)
+    end)
   end
 
   defp base_parameter(opts \\ []) do

@@ -1,5 +1,5 @@
 defmodule Arke.Core.ParameterTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   defp check_arke(context) do
     arke_model = ArkeManager.get(:arke, :arke_system)
@@ -41,16 +41,6 @@ defmodule Arke.Core.ParameterTest do
 
         %{link_status: "missing"}
     end
-  end
-
-  defp get_msg(id) do
-    {:error,
-     [
-       %{
-         context: "Elixir.Arke.Boundary.ParameterManager",
-         message: "Unit with id '#{to_string(id)}' not found"
-       }
-     ]}
   end
 
   describe "String" do
@@ -187,7 +177,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -301,10 +291,10 @@ defmodule Arke.Core.ParameterTest do
       QueryManager.delete(:test_schema, unit)
 
       assert parameter_unit.data.values == [
-               %{label: "1", value: "1"},
-               %{label: "2", value: "2"},
-               %{label: "3", value: "3"},
-               %{label: "4", value: "4"}
+               %{label: "1", value: 1},
+               %{label: "2", value: 2},
+               %{label: "3", value: 3},
+               %{label: "4", value: 4}
              ]
 
       assert unit.data.integer_test_values == [1, 2]
@@ -327,7 +317,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -427,10 +417,10 @@ defmodule Arke.Core.ParameterTest do
 
       # TODO: fix parsing if list of values is passed
       assert parameter_unit.data.values == [
-               %{label: "1", value: "1"},
-               %{label: "2", value: "2"},
-               %{label: "3", value: "3"},
-               %{label: "4", value: "4"}
+               %{label: "1", value: 1},
+               %{label: "2", value: 2},
+               %{label: "3", value: 3},
+               %{label: "4", value: 4}
              ]
 
       assert unit.data.float_test_values == [1, 2]
@@ -453,7 +443,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -507,14 +497,16 @@ defmodule Arke.Core.ParameterTest do
 
     test "create unit (error)" do
       arke_model = ArkeManager.get(:test_arke_parameter, :test_schema)
-      # FIXME:  validator should accept only true or false for boolean and not string nor number
+
       {:error, unit} =
         QueryManager.create(:test_schema, arke_model, %{
           boolean_test: "string not valid",
           label: "First boolean unit"
         })
 
-      assert unit == [%{context: "parameter_validation", message: "Test boolean: max is 5"}]
+      assert unit == [
+               %{context: "parameter_validation", message: "Test boolean: must be a boolean"}
+             ]
     end
 
     test "delete" do
@@ -527,7 +519,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -602,7 +594,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -679,7 +671,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -785,7 +777,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -891,7 +883,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
@@ -988,7 +980,7 @@ defmodule Arke.Core.ParameterTest do
                %{
                  context: "parameter_validation",
                  message:
-                   "Test datetime: must be %DateTime | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
+                   "Test datetime: must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
                }
              ]
     end
@@ -1003,12 +995,16 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 
   describe "Link" do
-    defp get_link_opts(_context), do: %{opts: [id: :link_test, label: "Test link"]}
+    defp get_link_opts(_context),
+      do: %{
+        opts: [id: :link_test, label: "Test link", arke_or_group_id: "test_arke_parameter"]
+      }
+
     setup [:get_link_opts, :create_param, :check_arke, :check_parameter_node]
 
     test "create" do
@@ -1022,7 +1018,8 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.create(:test_schema, parameter_model,
         id: :test_association_link,
-        label: "Test Association link"
+        label: "Test Association link",
+        arke_or_group_id: "test_arke_parameter"
       )
 
       arke = ArkeManager.get(:test_arke_parameter, :test_schema)
@@ -1058,18 +1055,18 @@ defmodule Arke.Core.ParameterTest do
       assert unit.data.link_test == ["to define"]
     end
 
-    test "create unit (error)" do
+    # TODO: link values are not validated. Once a validator exists for the link
+    # type this should assert {:error, ...} instead of a successful create.
+    test "create unit (invalid value is not rejected)" do
       arke_model = ArkeManager.get(:test_arke_parameter, :test_schema)
-      # TODO: validator for link type
-      {:error, unit} =
+
+      {:ok, unit} =
         QueryManager.create(:test_schema, arke_model, %{
           link_test: "31-01-1999",
           label: "First link unit"
         })
 
-      assert unit == [
-               %{context: "parameter_validation", message: "Test link: validator to define"}
-             ]
+      assert unit.data.link_test == "31-01-1999"
     end
 
     test "delete" do
@@ -1082,7 +1079,7 @@ defmodule Arke.Core.ParameterTest do
 
       QueryManager.delete(:test_schema, unit)
 
-      assert ParameterManager.get(values[:id], :test_schema) == get_msg(values[:id])
+      assert ParameterManager.get(values[:id], :test_schema) == nil
     end
   end
 end

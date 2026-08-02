@@ -1,5 +1,5 @@
 defmodule Arke.Core.ArkeTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   describe "Arke CRUD" do
     test "create Arke" do
@@ -35,8 +35,8 @@ defmodule Arke.Core.ArkeTest do
 
       old_arke = ArkeManager.get(:test, :test_schema)
 
-      QueryManager.update(old_arke, %{label: 1234})
-      assert ArkeManager.get(:test, :test_schema) != old_arke
+      assert {:error, _msg} = QueryManager.update(old_arke, %{label: 1234})
+      assert ArkeManager.get(:test, :test_schema) == old_arke
     end
 
     test "delete Arke" do
@@ -47,8 +47,7 @@ defmodule Arke.Core.ArkeTest do
 
       assert QueryManager.delete(:test_schema, arke) == {:ok, nil}
 
-      {:error, msg} = ArkeManager.get(:test2, :test_schema)
-      assert String.downcase(List.first(msg)[:message]) == "unit with id 'test2' not found"
+      assert ArkeManager.get(:test2, :test_schema) == nil
     end
 
     test "delete Arke (error)" do

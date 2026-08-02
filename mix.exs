@@ -21,7 +21,6 @@ defmodule Arke.MixProject do
       description: description(),
       package: package(),
       start_permanent: Mix.env() == :prod,
-      test_coverage: [tool: ExCoveralls],
       aliases: aliases(),
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -51,9 +50,9 @@ defmodule Arke.MixProject do
   defp deps do
     [
       {:typed_struct, "~> 0.2.1"},
+      {:jason, "~> 1.0"},
       {:uuid, "~> 1.1"},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.10", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:timex, "~> 3.7.11"},
       {:google_api_storage, "~> 0.34.0"},

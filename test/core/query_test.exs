@@ -1,5 +1,5 @@
 defmodule Arke.Core.QueryTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   defp get_query(_context), do: %{query: Query.new(nil, :test_schema)}
 

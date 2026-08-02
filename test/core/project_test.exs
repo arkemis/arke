@@ -1,22 +1,5 @@
 defmodule Arke.Core.ProjectTest do
-  use Arke.RepoCase, async: true
-
-  defp check_project() do
-    with nil <-
-           QueryManager.get_by(arke_id: "project_to_delete", project: :arke_system) do
-      project = ArkeManager.get(:arke_project, :arke_system)
-
-      QueryManager.create(:arke_system, project, %{
-        id: "project_to_delete",
-        name: "project_to_delete",
-        description: "project to delete",
-        type: "postgres_schema",
-        label: "Project to delete"
-      })
-    else
-      _ -> nil
-    end
-  end
+  use Arke.Test.RepoCase
 
   describe "Project" do
     test "create" do
@@ -48,9 +31,20 @@ defmodule Arke.Core.ProjectTest do
     end
 
     test "delete" do
-      check_project()
+      project = ArkeManager.get(:arke_project, :arke_system)
 
-      assert 9 == 1
+      {:ok, unit} =
+        QueryManager.create(:arke_system, project, %{
+          id: "project_to_delete",
+          name: "project_to_delete",
+          description: "project to delete",
+          type: "postgres_schema",
+          label: "Project to delete"
+        })
+
+      assert QueryManager.get_by(id: "project_to_delete", project: :arke_system) != nil
+      assert QueryManager.delete(:arke_system, unit) == {:ok, nil}
+      assert QueryManager.get_by(id: "project_to_delete", project: :arke_system) == nil
     end
   end
 end
