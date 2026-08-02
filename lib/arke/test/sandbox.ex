@@ -29,8 +29,6 @@ defmodule Arke.Test.Sandbox do
       setup do
         on_exit(&Arke.Test.Sandbox.restore/0)
       end
-
-  `Arke.Test.RepoCase` does the second part for you.
   """
 
   alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager}
