@@ -28,7 +28,6 @@ defmodule Arke.Utils.DatetimeHandler do
   @general_msg " values must be %Date{} | ~D[YYYY-MM-DD]| %DateTime{} | %NaiveDateTime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]"
 
   @utc "Etc/UTC"
-  @calendar_units [:years, :months, :weeks, :days]
   @clock_units [:hours, :minutes, :seconds]
 
   def now(:datetime), do: DateTime.utc_now() |> DateTime.truncate(:second)
@@ -173,10 +172,6 @@ defmodule Arke.Utils.DatetimeHandler do
   defp to_datetime(_value), do: :error
 
   defp encode(datetime, "{ISO:Basic:Z}"), do: {:ok, DateTime.to_iso8601(datetime, :basic)}
-  defp encode(datetime, "{ISO:Basic}"), do: {:ok, DateTime.to_iso8601(datetime, :basic)}
-
-  defp encode(datetime, "{ISO:Extended:Z}"),
-    do: {:ok, DateTime.to_iso8601(datetime, :extended)}
 
   defp encode(datetime, "{ISO:Extended}") do
     formatted =
@@ -191,11 +186,7 @@ defmodule Arke.Utils.DatetimeHandler do
     do: {:error, "unsupported datetime format #{inspect(format)}"}
 
   defp shift_units(datetime, opts) do
-    shifted =
-      datetime
-      |> shift_years(Keyword.get(opts, :years, 0))
-      |> shift_months(Keyword.get(opts, :months, 0))
-      |> shift_days(Keyword.get(opts, :weeks, 0) * 7 + Keyword.get(opts, :days, 0))
+    shifted = shift_calendar_units(datetime, opts)
 
     case clock_seconds(opts) do
       nil -> shifted
@@ -203,8 +194,8 @@ defmodule Arke.Utils.DatetimeHandler do
     end
   end
 
-  defp shift_calendar_units(date, opts) do
-    date
+  defp shift_calendar_units(value, opts) do
+    value
     |> shift_years(Keyword.get(opts, :years, 0))
     |> shift_months(Keyword.get(opts, :months, 0))
     |> shift_days(Keyword.get(opts, :weeks, 0) * 7 + Keyword.get(opts, :days, 0))
