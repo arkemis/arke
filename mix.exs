@@ -14,7 +14,7 @@ defmodule Arke.MixProject do
       config_path: "./config/config.exs",
       deps_path: "./deps",
       lockfile: "./mix.lock",
-      elixir: "~> 1.13",
+      elixir: "~> 1.16",
       source_url: @scm_url,
       homepage_url: @site_url,
       dialyzer: [plt_add_apps: ~w[eex]a],
