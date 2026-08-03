@@ -233,6 +233,9 @@ defmodule Arke.Core.Unit do
     Map.merge(unit.data, parsed_data, fn _k, udata, pdata -> pdata end)
   end
 
+  @spec generate_id() :: String.t()
+  def generate_id, do: Uniq.UUID.uuid1()
+
   def as_args(arke, unit) do
     [
       id: handle_id(unit.id),
@@ -244,7 +247,7 @@ defmodule Arke.Core.Unit do
     ]
   end
 
-  defp handle_id(id) when is_nil(id), do: UUID.uuid1()
+  defp handle_id(id) when is_nil(id), do: generate_id()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
   defp handle_id(id) when is_binary(id), do: id
   # TODO handle error
@@ -268,7 +271,7 @@ defmodule Arke.Core.Unit do
 
   defp update_encoded_unit_data(_, data, _), do: data
 
-  defp handle_id(id) when is_nil(id), do: UUID.uuid1()
+  defp handle_id(id) when is_nil(id), do: generate_id()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
   defp handle_id(id) when is_binary(id), do: id
   # TODO handle error
