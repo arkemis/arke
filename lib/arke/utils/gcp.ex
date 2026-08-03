@@ -69,8 +69,8 @@ defmodule Arke.Utils.Gcp do
     gcp_service_account = opts[:service_account] || System.get_env("STORAGE_SERVICE_ACCOUNT")
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
 
-    %Tesla.Client{pre: [{Tesla.Middleware.Headers, :call, [auth_headers]}]} = get_connection()
-    headers = [{"Content-Type", "application/json"}] ++ auth_headers
+    conn = get_connection()
+    headers = [{"Content-Type", "application/json"}]
 
     url =
       "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/#{gcp_service_account}:signBlob"
@@ -80,8 +80,11 @@ defmodule Arke.Utils.Gcp do
     signature = ["GET", "", "", expires, resource] |> Enum.join("\n") |> Base.encode64()
     body = %{"payload" => signature} |> Poison.encode!()
 
-    case HTTPoison.post(url, body, headers) do
-      {:ok, %{status_code: 200, body: result}} ->
+    case Tesla.post(conn, url, body,
+           headers: headers,
+           opts: [adapter: [timeout: 5_000, connect_timeout: 8_000]]
+         ) do
+      {:ok, %{status: 200, body: result}} ->
         %{"signedBlob" => signed_blob} = Poison.decode!(result)
 
         qs =
@@ -98,7 +101,7 @@ defmodule Arke.Utils.Gcp do
            expiration: expires
          }}
 
-      {:ok, %{status_code: 403} = err} ->
+      {:ok, %{status: 403}} ->
         {:error, "Forbidden resource"}
 
       {:ok, e} ->

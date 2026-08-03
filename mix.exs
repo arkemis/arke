@@ -54,9 +54,10 @@ defmodule Arke.MixProject do
       {:uuid, "~> 1.1"},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:mimic, "~> 2.3", only: :test},
       {:google_api_storage, "~> 0.34.0"},
       {:goth, "~> 1.4.5"},
-      {:httpoison, "~> 2.0"},
+      {:tesla, "~> 1.21"},
       {:xlsxir, "~> 1.6"},
       {:libcluster, "~> 3.3"}
     ]
