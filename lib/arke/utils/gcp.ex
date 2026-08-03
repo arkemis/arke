@@ -70,6 +70,10 @@ defmodule Arke.Utils.Gcp do
   credentials have no private key to sign with.
   """
   def get_bucket_file_signed_url(file_path, opts \\ []) do
+    if opts[:service_account] do
+      Logger.warning("service_account option is ignored: urls are signed as the credentials' client_email")
+    end
+
     expires = DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(1 * 3600)
     resource = "/#{bucket(opts)}/#{URI.encode(file_path)}"
     string_to_sign = ["GET", "", "", expires, resource] |> Enum.join("\n")
