@@ -3,6 +3,7 @@ import Config
 config :arke,
   persistence: %{
     arke_postgres: %{
+      repo: Arke.Test.Persistence,
       create: &Arke.Test.Persistence.create/2,
       update: &Arke.Test.Persistence.update/2,
       update_key: &Arke.Test.Persistence.update_key/2,

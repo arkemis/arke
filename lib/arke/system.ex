@@ -58,16 +58,15 @@ defmodule Arke.System do
             %{runtime_data: %{conn: %{method: "POST"} = conn}, metadata: %{project: project}} =
               arke
           ) do
-        member = ArkeAuth.Guardian.get_member(conn)
         mode = Map.get(conn.body_params, "mode", "default")
 
         case Map.get(conn.body_params, "file", nil) do
           nil -> {:error, "file is required", 400}
-          file -> import_units(arke, project, member, file, mode)
+          file -> import_units(arke, project, file, mode)
         end
       end
 
-      defp import_units(arke, project, member, file, mode) do
+      defp import_units(arke, project, file, mode) do
         {:ok, ref} = Enum.at(Xlsxir.multi_extract(file.path), 0)
         all_units = get_all_units_for_import(project)
 
@@ -141,9 +140,14 @@ defmodule Arke.System do
         {existing_units, units_args, error_units} =
           before_unit_import(project, existing_units, units_args, error_units)
 
-        Enum.map(Stream.chunk_every(units_args, 5000) |> Enum.to_list(), fn chunk ->
-          ArkePostgres.Repo.insert_all("arke_unit", chunk, prefix: Atom.to_string(project))
-        end)
+        repo =
+          Application.get_env(:arke, :persistence)[:arke_postgres][:repo] ||
+            raise "no :repo configured under config :arke, :persistence"
+
+        Enum.each(
+          Enum.chunk_every(units_args, 5000),
+          &repo.insert_all("arke_unit", &1, prefix: Atom.to_string(project))
+        )
 
         on_unit_import(project, existing_units, units_args, error_units)
       end
@@ -229,7 +233,7 @@ defmodule Arke.System do
 
                      # Import
                      import: 1,
-                     import_units: 5,
+                     import_units: 4,
                      get_header_for_import: 3,
                      get_all_units_for_import: 1,
                      load_units: 6,
