@@ -16,9 +16,8 @@ defmodule Arke.Utils.Gcp do
   @moduledoc """
   Google Cloud Storage backend for `Arke.Utils.FileStorage`.
 
-  Talks to the GCS JSON API over Req. The requests it builds are pinned
-  against `test/support/fixtures/gcs_requests.exs`, recorded from the
-  `google_api_storage` client this replaced.
+  Talks to the GCS JSON API over Req. The requests it builds are pinned by
+  `test/support/fixtures/gcs_requests.exs`.
   """
   use Arke.Utils.FileStorage
   require Logger
@@ -65,9 +64,9 @@ defmodule Arke.Utils.Gcp do
   end
 
   @doc """
-  A V2 signed url for the object, signed locally with the service account key.
+  A V2 signed url for the object, signed with the service account key.
 
-  Requires service account credentials: the metadata server and gcloud user
+  Requires service account credentials: metadata server and gcloud user
   credentials have no private key to sign with.
   """
   def get_bucket_file_signed_url(file_path, opts \\ []) do
@@ -102,8 +101,7 @@ defmodule Arke.Utils.Gcp do
     end
   end
 
-  # Req retries safe requests by default and Tesla did not; keep the calls
-  # one-shot and bounded, as they were.
+  # Req retries safe requests by default; keep every call one-shot and bounded.
   defp request(opts) do
     {:ok, token} = Auth.token()
 

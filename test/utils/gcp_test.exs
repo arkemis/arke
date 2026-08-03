@@ -18,8 +18,8 @@ defmodule Arke.Utils.GcpTest do
     :ok
   end
 
-  # Stubbing the adapter rather than Req.request/1 keeps the request steps in
-  # play, so the asserted request is the one that actually goes out.
+  # Stubbing the adapter keeps the request steps in play, so the asserted
+  # request is the one that actually goes out.
   defp respond(status, body) do
     expect(Req.Finch, :run, fn request ->
       send(self(), {:request, request})

@@ -1,11 +1,7 @@
-# Requests produced by google_api_storage 0.34.0 / google_gax 0.4.1 under
-# tesla 1.16.0 — the last version where that stack worked. tesla 1.17+ made
-# Compression's :max_body_size mandatory and required binary multipart field
-# names, and archived google_gax violates both. These are the requests the
-# replacement must reproduce.
+# The requests `Arke.Utils.Gcp` must produce, as recorded from
+# google_api_storage 0.34.0 / google_gax 0.4.1.
 #
-# Recorded once, not generated on each run. To re-record: set tesla to
-# "~> 1.16.0" in mix.exs, restore this recorder, and run it.
+# Recorded once, not generated on each run: that client is no longer installed.
 %{
   upload_simple: %{
     body: %{

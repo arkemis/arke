@@ -1,14 +1,7 @@
 defmodule Arke.Utils.GcpEquivalenceTest do
   @moduledoc """
-  Proves the Req implementation issues the same requests as the
-  `google_api_storage` one it replaces.
-
-  The baseline could not be captured live: `google_gax 0.4.1` is broken under the
-  locked tesla 1.21 — it passes `DecompressResponse` without the now-required
-  `:max_body_size` and uses atom multipart field names, both rejected by the
-  1.17+ security fixes. So the expected requests were recorded once under tesla
-  1.16.0, the last working version, into
-  `test/support/fixtures/gcs_requests.exs`.
+  Checks every storage request against the recording in
+  `test/support/fixtures/gcs_requests.exs`, so the wire format cannot drift.
 
   Not async: the recorded requests resolve their bucket from `DEFAULT_BUCKET`.
   """
@@ -55,8 +48,8 @@ defmodule Arke.Utils.GcpEquivalenceTest do
     {:ok, fixtures: TestGcp.request_fixtures()}
   end
 
-  # Stubbing the adapter rather than Req.request/1 keeps the request steps in
-  # play, so the asserted request is the one that actually goes out.
+  # Stubbing the adapter keeps the request steps in play, so the asserted
+  # request is the one that actually goes out.
   defp respond(status, body) do
     pid = self()
 
@@ -73,7 +66,7 @@ defmodule Arke.Utils.GcpEquivalenceTest do
     end
 
     for key <- @cases do
-      test "#{key} matches the recorded google_api_storage request", %{fixtures: fixtures} do
+      test "#{key} matches the recorded request", %{fixtures: fixtures} do
         call(unquote(key))
 
         assert_received {:request, request}

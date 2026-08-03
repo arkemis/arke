@@ -16,9 +16,9 @@ defmodule Arke.Utils.Gcp.Auth do
   @moduledoc """
   Google credentials for `Arke.Utils.Gcp`.
 
-  Resolves application default credentials the way Goth did, then either mints an
-  OAuth access token (`token/0`) or hands back the service account key so signed
-  URLs can be signed locally (`signer/0`).
+  Resolves application default credentials, then either mints an OAuth access
+  token (`token/0`) or returns the service account key to sign blobs with
+  (`signer/0`).
 
   Credentials are resolved on every call, first hit wins:
 
@@ -48,7 +48,7 @@ defmodule Arke.Utils.Gcp.Auth do
   @doc """
   The service account able to sign blobs: `{client_email, private_key_pem}`.
 
-  Only service account credentials carry a private key; the metadata server and
+  Only service account credentials carry a private key; metadata server and
   gcloud user credentials return `{:error, :no_private_key}`.
   """
   def signer() do

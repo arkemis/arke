@@ -52,14 +52,9 @@
   `{:system, "VAR"}`, or a decoded map) → `GOOGLE_APPLICATION_CREDENTIALS` (path)
   → `GOOGLE_APPLICATION_CREDENTIALS_JSON` (inline JSON) → gcloud ADC
   (`~/.config/gcloud/application_default_credentials.json`) → GCE metadata.
-  Coming from Goth, `config :goth, json: x` becomes
-  `config :arke, gcp_credentials: x`.
-- Signed URLs are signed locally with the service account private key, so they
-  need service-account JSON credentials — the metadata server and gcloud user
-  credentials have no key to sign with and return
-  `{:error, "error on signed url"}`. No IAM `signBlob` call and no
-  `roles/iam.serviceAccountTokenCreator` grant are involved any more, and
-  `STORAGE_SERVICE_ACCOUNT` is no longer read: the signer identity is the key's
-  `client_email`.
+- Signed URLs (V2) are signed with the service account private key, so they need
+  service-account JSON credentials: metadata server and gcloud user credentials
+  have no key to sign with and return `{:error, "error on signed url"}`. The
+  signer identity is the key's `client_email`.
 - libcluster is started with `Application.get_env(:libcluster, :topologies, [])`
   — leave it unconfigured on single-node deployments.
