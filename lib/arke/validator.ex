@@ -43,7 +43,7 @@ defmodule Arke.Validator do
       %{:error, [message]}
 
   """
-  @spec validate(unit :: Unit.t(), peristence_fn :: (() -> any()), project :: atom()) ::
+  @spec validate(unit :: Unit.t(), peristence_fn :: (-> any()), project :: atom()) ::
           func_return()
   def validate(%{arke_id: arke_id} = unit, persistence_fn, project \\ :arke_system) do
     with {:ok, unit} <- check_duplicate_unit(unit, project, persistence_fn) do
@@ -54,6 +54,7 @@ defmodule Arke.Validator do
         Enum.filter(ArkeManager.get_parameters(arke), fn %{data: %{persistence: persistence}} ->
           persistence == "arke_parameter"
         end)
+
       res =
         Enum.reduce(unit_parameters, {unit, errors}, fn p, {new_unit, errors} = _res ->
           {value, err} = validate_parameter(arke, p, Unit.get_value(data, p.id), project)
@@ -135,7 +136,7 @@ defmodule Arke.Validator do
 
   def validate_parameter(arke, parameter, value, project) when is_atom(parameter) do
     parameter = get_parameter(arke, parameter, project)
-    check_parameter(parameter, value, project,arke)
+    check_parameter(parameter, value, project, arke)
   end
 
   defp get_parameter(nil, parameter_id, project),
@@ -145,20 +146,20 @@ defmodule Arke.Validator do
     do: ArkeManager.get_parameter(arke, parameter_id)
 
   def validate_parameter(arke, parameter, value, project) do
-    check_parameter(parameter, value, project,arke)
+    check_parameter(parameter, value, project, arke)
   end
 
-  defp check_parameter(parameter, value, project,arke) do
+  defp check_parameter(parameter, value, project, arke) do
     value = get_default_value(parameter, value)
     value = parse_value(parameter, value)
     value = check_whitespace(parameter, value)
-    value = check_lowercase(parameter,value)
+    value = check_lowercase(parameter, value)
 
     errors =
       []
       |> check_required_parameter(parameter, value)
       |> check_by_type(parameter, value)
-      |> check_duplicate(parameter, value, project,arke)
+      |> check_duplicate(parameter, value, project, arke)
 
     {value, errors}
   end
@@ -222,15 +223,15 @@ defmodule Arke.Validator do
   defp check_required_parameter(errors, _parameter, _value), do: errors
 
   defp check_duplicate(errors, %{id: id, data: %{unique: true}} = _parameter, nil, project),
-       do: errors ++ [{"value must not be null for", id}]
+    do: errors ++ [{"value must not be null for", id}]
 
-  defp check_duplicate(errors, %{id: id, data: %{unique: true}} = parameter, value, project,arke) do
+  defp check_duplicate(errors, %{id: id, data: %{unique: true}} = parameter, value, project, arke) do
     with nil <- QueryManager.get_by(%{id => value, :project => project, :arke_id => arke.id}),
          do: errors,
          else: (_ -> errors ++ [{"duplicate values are not allowed for", id}])
   end
 
-  defp check_duplicate(errors, _parameter, _value, _project,_arke), do: errors
+  defp check_duplicate(errors, _parameter, _value, _project, _arke), do: errors
 
   defp check_by_type(errors, _parameter, value) when is_nil(value), do: errors
 
@@ -259,11 +260,12 @@ defmodule Arke.Validator do
 
   defp check_values(
          errors,
-         %{arke_id: type, data: %{values: values, label: label,multiple: true}} = parameter,
+         %{arke_id: type, data: %{values: values, label: label, multiple: true}} = parameter,
          value
        )
        when is_list(value) do
     admitted_values = Enum.map(values, fn %{label: _l, value: v} -> v end)
+
     with true <- check_values_type(value, type) do
       with [] <- value -- admitted_values do
         errors
@@ -288,7 +290,8 @@ defmodule Arke.Validator do
          value
        ),
        do: errors ++ [{value, "#{label} must be a list of #{type}}"}]
- defp check_values(errors,_parameter,_value), do: errors
+
+  defp check_values(errors, _parameter, _value), do: errors
 
   defp check_values_type(value, type) do
     condition =
@@ -300,18 +303,32 @@ defmodule Arke.Validator do
 
     Enum.all?(value, &condition.(&1))
   end
+
   # --- end Enum ---
   # --- start Multiple ---
-  defp check_multiple(errors, %{id: id, data: %{multiple: false}} = _parameter, value) when is_list(value), do: errors ++ [{"multiple values are not allowed for", id}]
-  defp check_multiple(errors, %{id: id, data: %{multiple: true}} = parameter, value) when not is_list(value), do: check_multiple(errors, parameter, [value])
-  defp check_multiple(errors, %{id: id, arke_id: type, data: %{ multiple: true}} = parameter, value) do
-    case check_values_type(value,type) do
-      true -> errors
+  defp check_multiple(errors, %{id: id, data: %{multiple: false}} = _parameter, value)
+       when is_list(value),
+       do: errors ++ [{"multiple values are not allowed for", id}]
+
+  defp check_multiple(errors, %{id: id, data: %{multiple: true}} = parameter, value)
+       when not is_list(value),
+       do: check_multiple(errors, parameter, [value])
+
+  defp check_multiple(
+         errors,
+         %{id: id, arke_id: type, data: %{multiple: true}} = parameter,
+         value
+       ) do
+    case check_values_type(value, type) do
+      true ->
+        errors
+
       false ->
-        errors ++ [{"[#{Enum.join(value,",")}]", "#{id} must be a list of #{type} "}]
+        errors ++ [{"[#{Enum.join(value, ",")}]", "#{id} must be a list of #{type} "}]
     end
   end
-  defp check_multiple(errors,_parameter,_value), do: errors
+
+  defp check_multiple(errors, _parameter, _value), do: errors
   # --- end Multiple ---
 
   defp check_whitespace(%{data: %{strip: true}} = parameter, value) when is_atom(value) do
@@ -353,7 +370,8 @@ defmodule Arke.Validator do
          value
        ) do
     # todo: used to parse override in metadata which can be written as string
-    max = parse_value(%{arke_id: :integer, data: %{multiple: false}},max_length)
+    max = parse_value(%{arke_id: :integer, data: %{multiple: false}}, max_length)
+
     if String.length(value) > max do
       errors ++ [{label, "max length is #{max_length}"}]
     else
@@ -371,7 +389,8 @@ defmodule Arke.Validator do
          value
        ) do
     # todo: used to parse override in metadata which can be written as string
-    min = parse_value(%{arke_id: :integer, data: %{multiple: false}},min_length)
+    min = parse_value(%{arke_id: :integer, data: %{multiple: false}}, min_length)
+
     if String.length(value) < min do
       errors ++ [{label, "min length is #{min_length}"}]
     else
@@ -420,7 +439,8 @@ defmodule Arke.Validator do
   defp check_max(errors, %{data: %{max: max}} = parameter, _) when is_nil(max), do: errors
 
   defp check_max(errors, %{data: %{max: max, label: label}} = parameter, value) do
-    parsed_max = parse_value(parameter,max)
+    parsed_max = parse_value(parameter, max)
+
     if value > parsed_max do
       errors ++ [{label, "max is #{max}"}]
     else
@@ -431,7 +451,8 @@ defmodule Arke.Validator do
   defp check_min(errors, %{data: %{min: min}} = parameter, _) when is_nil(min), do: errors
 
   defp check_min(errors, %{data: %{min: min, label: label}} = parameter, value) do
-    parsed_min = parse_value(parameter,min)
+    parsed_min = parse_value(parameter, min)
+
     if value < parsed_min do
       errors ++ [{label, "min is #{min}"}]
     else

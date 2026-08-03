@@ -50,6 +50,7 @@ defmodule Arke.Utils.ErrorGenerator do
   def create(_context, _errors), do: create(:error_generator, "invalid attribute format")
 
   defp create_map(_context, _errors, error_list \\ [])
+
   defp create_map(context, [{message, values} = _h | t] = _errors, error_list)
        when is_list(values) do
     create_map(

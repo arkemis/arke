@@ -43,7 +43,8 @@ defmodule Arke.Test.Gcp do
       method: request.method,
       url: request.url |> struct(query: nil) |> URI.to_string(),
       query: URI.decode_query(request.url.query || ""),
-      headers: request |> Req.get_headers_list() |> reject_framing_headers() |> normalize_headers(),
+      headers:
+        request |> Req.get_headers_list() |> reject_framing_headers() |> normalize_headers(),
       body: project_request_body(request)
     }
   end

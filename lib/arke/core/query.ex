@@ -100,13 +100,26 @@ defmodule Arke.Core.Query do
 
     defp cast_value(%Arke.Core.Unit{arke_id: arke_id} = _parameter, value) do
       case arke_id do
-        :datetime -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_datetime/1, value, "datetime")
-        :date -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_date/1, value, "date")
-        :time -> cast_temporal(&Arke.Utils.DatetimeHandler.parse_time/1, value, "time")
-        :integer -> cast_integer(value)
-        :float -> cast_float(value)
-        :boolean -> cast_boolean(value)
-        _ -> value
+        :datetime ->
+          cast_temporal(&Arke.Utils.DatetimeHandler.parse_datetime/1, value, "datetime")
+
+        :date ->
+          cast_temporal(&Arke.Utils.DatetimeHandler.parse_date/1, value, "date")
+
+        :time ->
+          cast_temporal(&Arke.Utils.DatetimeHandler.parse_time/1, value, "time")
+
+        :integer ->
+          cast_integer(value)
+
+        :float ->
+          cast_float(value)
+
+        :boolean ->
+          cast_boolean(value)
+
+        _ ->
+          value
       end
     end
 

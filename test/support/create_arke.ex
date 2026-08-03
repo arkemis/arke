@@ -12,7 +12,10 @@ defmodule Arke.Test.CreateArke do
       unique: true
     )
 
-    parameter(:enum_string_support, :string, required: false, values: ["first", "second", "third"])
+    parameter(:enum_string_support, :string,
+      required: false,
+      values: ["first", "second", "third"]
+    )
 
     parameter(:integer_support, :integer, required: false, default_integer: 5)
 

@@ -14,8 +14,8 @@
 
 defmodule Arke.Examples.Starter do
   @moduledoc """
-               Module to start all the defaults gen server
-             """
+    Module to start all the defaults gen server
+  """
   alias Arke.Boundary.{ArkeManager}
 
   @doc """
@@ -78,5 +78,4 @@ defmodule Arke.Examples.Starter do
       ArkeManager.add_parameter(parent_id, :arke_system, child_id, data.metadata)
     end)
   end
-
 end

@@ -19,6 +19,4 @@ defmodule Arke.Boundary.ParameterManager do
   manager_id(:parameter)
   # set_registry_name(:parameter_registry)
   # set_supervisor_name(:parameter_supervisor)
-
-  
 end

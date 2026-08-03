@@ -14,8 +14,8 @@
 
 defmodule Arke.Boundary.ArkeManager do
   @moduledoc """
-             This module manage the gen servers for the element specified in `Arke.Core.Arke`
-             """
+  This module manage the gen servers for the element specified in `Arke.Core.Arke`
+  """
 
   alias Arke.Utils.ErrorGenerator, as: Error
   use Arke.Boundary.UnitManager
@@ -35,7 +35,6 @@ defmodule Arke.Boundary.ArkeManager do
                                           metadata: parameter_metadata
                                         },
                                         new_parameters ->
-
       case init_parameter(project, parameter_id, parameter_metadata) do
         {:error, msg} -> new_parameters
         parameter -> [parameter | new_parameters]
@@ -65,7 +64,6 @@ defmodule Arke.Boundary.ArkeManager do
              %Unit{} = parameter <- init_parameter(project, id, metadata),
              do: parameter,
              else: ({:error, msg} -> nil)
-
     end
   end
 
@@ -93,12 +91,10 @@ defmodule Arke.Boundary.ArkeManager do
     end
   end
 
-
   defp check_module(%{__module__: nil} = unit),
     do: Unit.update(unit, __module__: Arke.System.Arke)
 
   defp check_module(unit), do: unit
-
 
   defp init_parameter(project, id, metadata, p) do
     arke_id = Map.get(p, :arke, nil)
@@ -115,7 +111,6 @@ defmodule Arke.Boundary.ArkeManager do
       nil,
       nil
     )
-
   end
 
   defp init_parameter(project, id, metadata) do
@@ -136,6 +131,8 @@ defmodule Arke.Boundary.ArkeManager do
   end
 
   defp handle_init_p(id, parameter, override_data) do
-    Map.update(parameter,:data, %{},fn v -> Map.merge(v,override_data, fn _k, pdata,ovdata -> ovdata end) end)
+    Map.update(parameter, :data, %{}, fn v ->
+      Map.merge(v, override_data, fn _k, pdata, ovdata -> ovdata end)
+    end)
   end
 end

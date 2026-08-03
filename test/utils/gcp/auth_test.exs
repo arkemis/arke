@@ -14,7 +14,8 @@ defmodule Arke.Utils.Gcp.AuthTest do
   setup do
     # Nothing must leak in from the machine running the suite, including its
     # gcloud ADC file: CLOUDSDK_CONFIG points the lookup at an empty dir.
-    for var <- ~w[GOOGLE_APPLICATION_CREDENTIALS GOOGLE_APPLICATION_CREDENTIALS_JSON CLOUDSDK_CONFIG] do
+    for var <-
+          ~w[GOOGLE_APPLICATION_CREDENTIALS GOOGLE_APPLICATION_CREDENTIALS_JSON CLOUDSDK_CONFIG] do
       previous = System.get_env(var)
       System.delete_env(var)
 
@@ -52,7 +53,9 @@ defmodule Arke.Utils.Gcp.AuthTest do
   end
 
   defp put_credentials_file(json) do
-    path = Path.join(System.tmp_dir!(), "arke-credentials-#{System.unique_integer([:positive])}.json")
+    path =
+      Path.join(System.tmp_dir!(), "arke-credentials-#{System.unique_integer([:positive])}.json")
+
     File.write!(path, json)
     System.put_env("GOOGLE_APPLICATION_CREDENTIALS", path)
     on_exit(fn -> File.rm(path) end)
@@ -162,7 +165,10 @@ defmodule Arke.Utils.Gcp.AuthTest do
     setup do
       account = TestGcp.service_account()
       # The env var must lose to application config.
-      put_credentials_file(service_account_json(TestGcp.service_account("env@project.iam.gserviceaccount.com")))
+      put_credentials_file(
+        service_account_json(TestGcp.service_account("env@project.iam.gserviceaccount.com"))
+      )
+
       {:ok, account: account}
     end
 
