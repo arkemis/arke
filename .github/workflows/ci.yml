@@ -23,6 +23,7 @@ jobs:
             otp: "26.2.5"
           - elixir: "1.18.4"
             otp: "26.2.5"
+            lint: lint
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Elixir
@@ -43,6 +44,9 @@ jobs:
         run: mix deps.get
       - name: Compile dependencies
         run: mix deps.compile
+      - name: Ensure files are formatted
+        run: mix format --check-formatted
+        if: ${{ matrix.lint }}
       - name: Build package
         run: mix hex.build
       - name: Run tests
