@@ -51,7 +51,8 @@
   each call, first hit wins: `config :arke, gcp_credentials:` (a JSON string,
   `{:system, "VAR"}`, or a decoded map) → `GOOGLE_APPLICATION_CREDENTIALS` (path)
   → `GOOGLE_APPLICATION_CREDENTIALS_JSON` (inline JSON) → gcloud ADC
-  (`~/.config/gcloud/application_default_credentials.json`) → GCE metadata.
+  (`application_default_credentials.json` in `$CLOUDSDK_CONFIG`, defaulting to
+  `~/.config/gcloud`) → GCE metadata.
 - Signed URLs (V2) are signed with the service account private key, so they need
   service-account JSON credentials: metadata server and gcloud user credentials
   have no key to sign with and return `{:error, "error on signed url"}`. The
