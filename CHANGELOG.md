@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] - 2026-08-03
+
+### Changed
+- Use github app for changelog push by @ilyichv in [#155](https://github.com/arkemis/arke/pull/155)
+- Pin actions to full SHAs and add a ci gate job by @ilyichv in [#154](https://github.com/arkemis/arke/pull/154)
+- Bump credo from 1.7.18 to 1.7.19 by @dependabot[bot] in [#147](https://github.com/arkemis/arke/pull/147)
+
+### Fixed
+- Drop httpoison in favour of tesla to shed hackney by @ilyichv in [#157](https://github.com/arkemis/arke/pull/157)
+- Drop timex, bump tesla/mint/hpax to clear advisories by @ilyichv in [#156](https://github.com/arkemis/arke/pull/156)
+- Cast filter values to their parameter type by @ilyichv in [#153](https://github.com/arkemis/arke/pull/153)
+- Dispatch on_update hooks at the arity QueryManager uses by @ilyichv in [#152](https://github.com/arkemis/arke/pull/152)
+- Restore test suite by @ilyichv in [#151](https://github.com/arkemis/arke/pull/151)
+
 ## [0.6.4] - 2026-07-30
 
 ### Changed
@@ -408,6 +422,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.6.5]: https://github.com/arkemis/arke/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/arkemis/arke/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/arkemis/arke/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/arkemis/arke/compare/v0.6.1...v0.6.2
