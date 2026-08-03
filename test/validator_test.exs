@@ -472,6 +472,18 @@ defmodule Arke.ValidatorTest do
                {datetime, []}
     end
 
+    test "unique with nil value returns an error instead of passing silently" do
+      # Regression test for the arity-4/arity-5 clause mismatch in
+      # Validator.check_duplicate/4-5: the nil-guard clause was never
+      # reachable, so a `unique: true` parameter with a nil value skipped
+      # validation entirely instead of being rejected.
+      parameter = %{id: :username, data: %{unique: true}}
+      arke = %{id: :test_arke}
+
+      assert Arke.Validator.validate_parameter(arke, parameter, nil, :test_schema) ==
+               {nil, [{"value must not be null for", :username}]}
+    end
+
     test "unique" do
       arke = ArkeManager.get(:arke_test_support, :arke_system)
 
