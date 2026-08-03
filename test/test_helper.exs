@@ -1,7 +1,7 @@
 ExUnit.start()
 
-Mimic.copy(Goth.Token)
-Mimic.copy(Tesla.Adapter.Httpc)
+Mimic.copy(Arke.Utils.Gcp.Auth)
+Mimic.copy(Req.Finch)
 
 Arke.Test.Persistence.setup()
 Arke.Test.Bootstrap.start()
