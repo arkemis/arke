@@ -26,7 +26,8 @@ defmodule Arke.Utils.Gcp.Auth do
        decoded map
     2. `GOOGLE_APPLICATION_CREDENTIALS` — path to the key file
     3. `GOOGLE_APPLICATION_CREDENTIALS_JSON` — inline JSON
-    4. `~/.config/gcloud/application_default_credentials.json` — gcloud ADC
+    4. `application_default_credentials.json` in the gcloud config dir
+       (`$CLOUDSDK_CONFIG`, defaulting to `~/.config/gcloud`) — gcloud ADC
     5. the GCE metadata server
   """
 
@@ -34,7 +35,6 @@ defmodule Arke.Utils.Gcp.Auth do
   @scope "https://www.googleapis.com/auth/cloud-platform"
   @jwt_grant "urn:ietf:params:oauth:grant-type:jwt-bearer"
   @metadata_url "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-  @adc_file "~/.config/gcloud/application_default_credentials.json"
 
   @doc """
   An OAuth access token for the resolved credentials.
@@ -73,7 +73,10 @@ defmodule Arke.Utils.Gcp.Auth do
   defp from_config(json) when is_binary(json), do: decode(json)
   defp from_config(%{} = credentials), do: {:ok, credentials}
 
-  defp adc_file(), do: Path.expand(@adc_file)
+  defp adc_file() do
+    gcloud_dir = System.get_env("CLOUDSDK_CONFIG") || Path.expand("~/.config/gcloud")
+    Path.join(gcloud_dir, "application_default_credentials.json")
+  end
 
   defp decode(json) do
     case Jason.decode(json) do

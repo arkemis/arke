@@ -12,12 +12,21 @@ defmodule Arke.Utils.Gcp.AuthTest do
   setup :verify_on_exit!
 
   setup do
-    # Nothing must leak in from the machine running the suite.
-    for var <- ~w[GOOGLE_APPLICATION_CREDENTIALS GOOGLE_APPLICATION_CREDENTIALS_JSON] do
+    # Nothing must leak in from the machine running the suite, including its
+    # gcloud ADC file: CLOUDSDK_CONFIG points the lookup at an empty dir.
+    for var <- ~w[GOOGLE_APPLICATION_CREDENTIALS GOOGLE_APPLICATION_CREDENTIALS_JSON CLOUDSDK_CONFIG] do
       previous = System.get_env(var)
       System.delete_env(var)
-      on_exit(fn -> if previous, do: System.put_env(var, previous) end)
+
+      on_exit(fn ->
+        if previous, do: System.put_env(var, previous), else: System.delete_env(var)
+      end)
     end
+
+    System.put_env(
+      "CLOUDSDK_CONFIG",
+      Path.join(System.tmp_dir!(), "arke-gcloud-#{System.unique_integer([:positive])}")
+    )
 
     on_exit(fn -> Application.delete_env(:arke, :gcp_credentials) end)
     :ok
