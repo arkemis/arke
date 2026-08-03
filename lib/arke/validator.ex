@@ -221,7 +221,13 @@ defmodule Arke.Validator do
 
   defp check_required_parameter(errors, _parameter, _value), do: errors
 
-  defp check_duplicate(errors, %{id: id, data: %{unique: true}} = _parameter, nil, project),
+  defp check_duplicate(
+         errors,
+         %{id: id, data: %{unique: true, required: true}} = _parameter,
+         nil,
+         _project,
+         _arke
+       ),
        do: errors ++ [{"value must not be null for", id}]
 
   defp check_duplicate(errors, %{id: id, data: %{unique: true}} = parameter, value, project,arke) do
