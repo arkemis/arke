@@ -20,13 +20,14 @@ defmodule Arke.Application do
   use Application
   @impl true
   def start(_type, _args) do
-    topologies = Application.get_env(:libcluster, :topologies,[])
+    topologies = Application.get_env(:libcluster, :topologies, [])
+
     children = [
       {Arke.Boundary.ParameterManager, [name: Arke.Boundary.ParameterManager]},
       {Arke.Boundary.ArkeManager, [name: Arke.Boundary.ArkeManager]},
       {Arke.Boundary.GroupManager, [name: Arke.Boundary.GroupManager]},
       {Arke.Boundary.FileManager, [name: Arke.Boundary.FileManager]},
-      {Cluster.Supervisor, [topologies, [name: Arke.ClusterSupervisor]]},
+      {Cluster.Supervisor, [topologies, [name: Arke.ClusterSupervisor]]}
       # Starts a worker by calling: ArkeMonorepo.Worker.start_link(arg)
       # {ArkeMonorepo.Worker, arg}
     ]

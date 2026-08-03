@@ -354,7 +354,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
       parameter_errors = handle_list_errors(link_parameter_error, parameter_error_msg, error)
       handle_arke(t, project, parameter_errors)
     else
-     %Unit{} = arke_model ->
+      %Unit{} = arke_model ->
         Mix.shell().info("--- Updating parameters for arke #{id} --- ")
 
         handle_arke_parameters(arke_model, parameter)
@@ -480,14 +480,14 @@ defmodule Mix.Tasks.Arke.SeedProject do
   end
 
   defp handle_group_members(%{metadata: %{project: project}} = current_group_model, arke_list) do
-
     arke_to_remove_ids = current_group_model.data.arke_list -- arke_list
     arke_to_add_ids = arke_list -- current_group_model.data.arke_list
 
     # every group has a `arke_list` field that stores the arke ids it contains.
     # Must be updated and the link will be handled automatically
     complete_arke_list =
-      ((current_group_model.data.arke_list -- arke_to_remove_ids) ++ arke_to_add_ids) |> Enum.uniq()
+      ((current_group_model.data.arke_list -- arke_to_remove_ids) ++ arke_to_add_ids)
+      |> Enum.uniq()
 
     QueryManager.get_by(project: project, id: current_group_model.id)
     |> QueryManager.update(arke_list: complete_arke_list)
@@ -512,7 +512,6 @@ defmodule Mix.Tasks.Arke.SeedProject do
     do: {to_string(child_id), Map.get(child, :metadata, %{})}
 
   defp get_link_data(child_id), do: {to_string(child_id), %{}}
-
 
   defp parse_error({:error, error_message}, error_accumulator) when is_list(error_message),
     do: error_message ++ error_accumulator

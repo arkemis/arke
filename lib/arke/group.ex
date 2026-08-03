@@ -26,8 +26,11 @@ defmodule Arke.System.Group do
 
       #      @before_compile unquote(__MODULE__)
 
-      def group_from_attr(), do: Keyword.get(__MODULE__.__info__(:attributes), :group, []) |> List.first()
-      def is_group?(), do: Keyword.get(__MODULE__.__info__(:attributes), :system_group, []) |> List.first()
+      def group_from_attr(),
+        do: Keyword.get(__MODULE__.__info__(:attributes), :group, []) |> List.first()
+
+      def is_group?(),
+        do: Keyword.get(__MODULE__.__info__(:attributes), :system_group, []) |> List.first()
 
       def on_unit_load(arke, data, _persistence_fn), do: {:ok, data}
       def before_unit_load(_arke, data, _persistence_fn), do: {:ok, data}
@@ -96,7 +99,7 @@ defmodule Arke.System.Group do
       unquote(block)
 
       @group %{
-        id: id,
+        id: id
       }
     end
   end
@@ -114,7 +117,7 @@ defmodule Arke.System.Group do
   See example above `arke/2`
 
   """
-  @spec parameter(id :: atom(), type:: atom(), opts :: list()) :: Macro.t()
+  @spec parameter(id :: atom(), type :: atom(), opts :: list()) :: Macro.t()
   defmacro parameter(id, type, opts \\ []) do
     # parameter_dict = Arke.System.BaseParameter.parameter_options(opts, id, type)
     quote bind_quoted: [id: id, type: type, opts: opts] do

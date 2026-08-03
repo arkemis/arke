@@ -215,7 +215,9 @@ defmodule Arke.Utils.DatetimeHandler do
 
   defp shift_days(value, 0), do: value
   defp shift_days(%Date{} = date, days), do: Date.add(date, days)
-  defp shift_days(%DateTime{} = datetime, days), do: replace_date(datetime, Date.add(datetime, days))
+
+  defp shift_days(%DateTime{} = datetime, days),
+    do: replace_date(datetime, Date.add(datetime, days))
 
   defp shift_years(value, 0), do: value
 

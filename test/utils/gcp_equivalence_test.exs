@@ -80,5 +80,4 @@ defmodule Arke.Utils.GcpEquivalenceTest do
       assert MapSet.new(Map.keys(fixtures)) == MapSet.new(@cases)
     end
   end
-
 end

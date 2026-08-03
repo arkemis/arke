@@ -268,7 +268,6 @@ defmodule Arke.Core.Unit do
 
   defp update_encoded_unit_data(_, data, _), do: data
 
-
   defp handle_id(id) when is_nil(id), do: UUID.uuid1()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
   defp handle_id(id) when is_binary(id), do: id

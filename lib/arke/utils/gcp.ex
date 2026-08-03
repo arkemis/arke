@@ -53,7 +53,9 @@ defmodule Arke.Utils.Gcp do
 
   def get_public_url(%{data: %{name: name, path: path, extension: ext}} = unit, opts \\ []) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    {:ok, %{signed_url: "https://storage.googleapis.com/#{bucket}/#{path}/#{name}",expiration: nil}}
+
+    {:ok,
+     %{signed_url: "https://storage.googleapis.com/#{bucket}/#{path}/#{name}", expiration: nil}}
   end
 
   def get_public_url(_unit, _opts), do: Error.create(:storage, "invalid unit")
@@ -71,7 +73,9 @@ defmodule Arke.Utils.Gcp do
   """
   def get_bucket_file_signed_url(file_path, opts \\ []) do
     if opts[:service_account] do
-      Logger.warning("service_account option is ignored: urls are signed as the credentials' client_email")
+      Logger.warning(
+        "service_account option is ignored: urls are signed as the credentials' client_email"
+      )
     end
 
     expires = DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(1 * 3600)

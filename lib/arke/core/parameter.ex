@@ -43,7 +43,6 @@ defmodule Arke.Core.Parameter do
   """
   alias Arke.Boundary.ParameterManager
 
-
   @type parameter_struct() ::
           Parameter.Boolean.t()
           | Parameter.String.t()
@@ -52,8 +51,8 @@ defmodule Arke.Core.Parameter do
           | Parameter.Float.t()
 
   @doc """
-       Macro defining a shared struct of parameter used across Arkes
-       """
+  Macro defining a shared struct of parameter used across Arkes
+  """
   use Arke.System.Group
 
   group id: "parameter" do
@@ -73,7 +72,6 @@ defmodule Arke.Core.Parameter do
     ParameterManager.remove(unit)
     {:ok, unit}
   end
-
 end
 
 defmodule Arke.Core.Parameter.String do
@@ -98,7 +96,7 @@ defmodule Arke.Core.Parameter.String do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "string" do
@@ -108,7 +106,6 @@ defmodule Arke.Core.Parameter.String do
     args = Arke.System.BaseParameter.check_enum(:string, Map.to_list(data))
     {:ok, Enum.into(args, %{})}
   end
-
 end
 
 defmodule Arke.Core.Parameter.Integer do
@@ -132,7 +129,7 @@ defmodule Arke.Core.Parameter.Integer do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "integer" do
@@ -142,7 +139,6 @@ defmodule Arke.Core.Parameter.Integer do
     args = Arke.System.BaseParameter.check_enum(:integer, Map.to_list(data))
     {:ok, Enum.into(args, %{})}
   end
-
 end
 
 defmodule Arke.Core.Parameter.Float do
@@ -166,7 +162,7 @@ defmodule Arke.Core.Parameter.Float do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "float" do
@@ -176,7 +172,6 @@ defmodule Arke.Core.Parameter.Float do
     args = Arke.System.BaseParameter.check_enum(:float, Map.to_list(data))
     {:ok, Enum.into(args, %{})}
   end
-
 end
 
 defmodule Arke.Core.Parameter.Boolean do
@@ -196,10 +191,10 @@ defmodule Arke.Core.Parameter.Boolean do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
-  arke id: "boolean"  do
+  arke id: "boolean" do
   end
 end
 
@@ -220,7 +215,7 @@ defmodule Arke.Core.Parameter.Dict do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "dict" do
@@ -244,7 +239,7 @@ defmodule Arke.Core.Parameter.List do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "list" do
@@ -276,7 +271,7 @@ defmodule Arke.Core.Parameter.Date do
 
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "date" do
@@ -307,12 +302,11 @@ defmodule Arke.Core.Parameter.Time do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "time" do
   end
-
 end
 
 defmodule Arke.Core.Parameter.DateTime do
@@ -342,7 +336,7 @@ defmodule Arke.Core.Parameter.DateTime do
 
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "datetime" do
@@ -366,12 +360,11 @@ defmodule Arke.Core.Parameter.Link do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
-  arke  id: "link" do
+  arke id: "link" do
   end
-
 end
 
 defmodule Arke.Core.Parameter.Dynamic do
@@ -384,7 +377,7 @@ defmodule Arke.Core.Parameter.Dynamic do
   """
   alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
-  
+
   use Arke.System
 
   arke id: "dynamic" do
@@ -405,5 +398,4 @@ defmodule Arke.Core.Parameter.Binary do
 
   arke id: "binary" do
   end
-
 end

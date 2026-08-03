@@ -116,7 +116,8 @@
   get_dated_path: %{
     body: %{body: nil, kind: :raw},
     query: [],
-    url: "https://storage.googleapis.com/storage/v1/b/probe-bucket/o/arke_file%2F2026-08-03%2010%3A11%3A12.345678Z%2Fmy%20file.png",
+    url:
+      "https://storage.googleapis.com/storage/v1/b/probe-bucket/o/arke_file%2F2026-08-03%2010%3A11%3A12.345678Z%2Fmy%20file.png",
     headers: [
       {"accept-encoding", "gzip, deflate, identity"},
       {"authorization", "Bearer test-token"}
@@ -146,7 +147,8 @@
   delete_dated_path: %{
     body: %{body: "", kind: :raw},
     query: [],
-    url: "https://storage.googleapis.com/storage/v1/b/probe-bucket/o/arke_file%2F2026-08-03%2010%3A11%3A12.345678Z%2Fmy%20file.png",
+    url:
+      "https://storage.googleapis.com/storage/v1/b/probe-bucket/o/arke_file%2F2026-08-03%2010%3A11%3A12.345678Z%2Fmy%20file.png",
     headers: [
       {"accept-encoding", "gzip, deflate, identity"},
       {"authorization", "Bearer test-token"}

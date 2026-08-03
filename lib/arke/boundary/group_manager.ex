@@ -20,7 +20,7 @@ defmodule Arke.Boundary.GroupManager do
   manager_id(:group)
 
   defp check_module(%{__module__: nil} = unit),
-       do: Unit.update(unit, __module__: Arke.System.BaseGroup)
+    do: Unit.update(unit, __module__: Arke.System.BaseGroup)
 
   defp check_module(unit), do: unit
 
@@ -59,11 +59,11 @@ defmodule Arke.Boundary.GroupManager do
 
       unit ->
         with %Unit{} = arke <-
-          Enum.find(get_arke_list(unit), {:error, "arke id not found"}, fn f ->
-            f.id == arke_id
-          end),
-        do: arke,
-        else: ({:error, msg} -> nil)
+               Enum.find(get_arke_list(unit), {:error, "arke id not found"}, fn f ->
+                 f.id == arke_id
+               end),
+             do: arke,
+             else: ({:error, msg} -> nil)
     end
   end
 
@@ -77,22 +77,23 @@ defmodule Arke.Boundary.GroupManager do
 
     Enum.reduce(group_keys, [], fn {g, _}, groups ->
       group = get(g, project)
+
       if arke_id in Enum.map(group.data.arke_list, fn a -> a.id end) do
-      [group | groups]
+        [group | groups]
       else
-      groups
+        groups
       end
     end)
   end
 
   def get_parameters(group_id, project), do: get(group_id, project) |> get_parameters
+
   def get_parameters(%{id: id, metadata: %{project: project}} = group) do
     parameters =
       get_arke_list(group)
       |> get_group_parameters(project)
       |> init_parameters_by_ids(project)
   end
-
 
   defp get_group_parameters(arke_list, _project) do
     Enum.reduce(arke_list, [], fn arke, group_parameters ->
