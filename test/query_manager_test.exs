@@ -26,6 +26,26 @@ defmodule Arke.QueryManagerTest do
     assert ArkeManager.get(:query_create, :test_schema) == nil
   end
 
+  test "update stamps updated_at with a second-precision UTC datetime" do
+    arke_model = ArkeManager.get(:arke, :arke_system)
+
+    {:ok, unit} =
+      QueryManager.create(:test_schema, arke_model,
+        id: :query_updated_at,
+        label: "Query updated_at"
+      )
+
+    before = DateTime.utc_now() |> DateTime.truncate(:second)
+    {:ok, updated} = QueryManager.update(unit, label: "Query updated_at changed")
+
+    assert %DateTime{} = updated.updated_at
+    assert updated.updated_at.time_zone == "Etc/UTC"
+    assert updated.updated_at.microsecond == {0, 0}
+    assert DateTime.compare(updated.updated_at, before) in [:eq, :gt]
+
+    QueryManager.delete(:test_schema, updated)
+  end
+
   defp load_unit(_context) do
     arke_model = ArkeManager.get(:arke, :arke_system)
     %{unit: Unit.load(arke_model, id: :unit_query_test, label: "Unit query test")}

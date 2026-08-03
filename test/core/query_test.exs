@@ -179,6 +179,37 @@ defmodule Arke.Core.QueryTest do
       assert %DateTime{} = filter_value(:default_datetime, "2026-08-02T09:55:13Z")
     end
 
+    test "casts datetimes to an exact UTC value" do
+      assert filter_value(:default_datetime, "2026-08-02T09:55:13Z") ==
+               ~U[2026-08-02 09:55:13Z]
+    end
+
+    test "casts a zone-less datetime string as UTC" do
+      assert filter_value(:default_datetime, "2026-08-02T09:55:13") ==
+               ~U[2026-08-02 09:55:13Z]
+    end
+
+    test "casts a space-separated datetime string" do
+      assert filter_value(:default_datetime, "2026-08-02 09:55:13Z") ==
+               ~U[2026-08-02 09:55:13Z]
+    end
+
+    test "normalises a non-UTC offset when casting" do
+      assert filter_value(:default_datetime, "2026-08-02T09:55:13+02:00") ==
+               ~U[2026-08-02 07:55:13Z]
+    end
+
+    test "passes already typed temporal values through" do
+      assert filter_value(:default_date, ~D[2026-08-02]) == ~D[2026-08-02]
+      assert filter_value(:default_time, ~T[09:55:13]) == ~T[09:55:13]
+      assert filter_value(:default_datetime, ~U[2026-08-02 09:55:13Z]) == ~U[2026-08-02 09:55:13Z]
+    end
+
+    test "raises on temporal values that cannot be cast" do
+      assert_raise ArgumentError, fn -> filter_value(:default_time, "not a time") end
+      assert_raise ArgumentError, fn -> filter_value(:default_datetime, "not a datetime") end
+    end
+
     test "passes nil through for every type" do
       for id <- [:default_integer, :default_float, :default_boolean, :default_datetime, :name] do
         assert filter_value(id, nil) == nil
