@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.5] - 2026-08-03
+## [0.7.0] - 2026-08-03
+
+### Breaking changes
+- Goth is dropped and `config :goth, json:` is no longer read; set `config :arke, gcp_credentials:` (a JSON string, `{:system, "VAR"}`, or a decoded map) or rely on GOOGLE_APPLICATION_CREDENTIALS(_JSON), gcloud ADC, or the metadata server. Signed urls are now signed locally with the service account key: service-account JSON credentials are required, STORAGE_SERVICE_ACCOUNT and the service_account: option are ignored, the signer identity is the key's client_email, and the roles/iam.serviceAccountTokenCreator grant is no longer needed. by @ErikFerrari in [#159](https://github.com/arkemis/arke/pull/159)
+
 
 ### Changed
 - Use github app for changelog push by @ilyichv in [#155](https://github.com/arkemis/arke/pull/155)
@@ -13,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump credo from 1.7.18 to 1.7.19 by @dependabot[bot] in [#147](https://github.com/arkemis/arke/pull/147)
 
 ### Fixed
+- Drop unused typed_struct by @ilyichv in [#160](https://github.com/arkemis/arke/pull/160)
+- Drop google-api-storage by @ErikFerrari in [#159](https://github.com/arkemis/arke/pull/159)
 - Drop httpoison in favour of tesla to shed hackney by @ilyichv in [#157](https://github.com/arkemis/arke/pull/157)
 - Drop timex, bump tesla/mint/hpax to clear advisories by @ilyichv in [#156](https://github.com/arkemis/arke/pull/156)
 - Cast filter values to their parameter type by @ilyichv in [#153](https://github.com/arkemis/arke/pull/153)
@@ -21,10 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.4] - 2026-07-30
 
+
 ### Changed
 - Usage rules by @ilyichv in [#146](https://github.com/arkemis/arke/pull/146)
 
 ## [0.6.3] - 2026-07-20
+
 
 ### Added
 - Add keep_values_formatting for values of parameter by @vittorio-reinaudo in [#145](https://github.com/arkemis/arke/pull/145)
@@ -33,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the actions-deps group across 1 directory with 2 updates by @dependabot[bot] in [#144](https://github.com/arkemis/arke/pull/144)
 
 ## [0.6.2] - 2026-06-11
+
 
 ### Changed
 - Bump the actions-deps group across 1 directory with 3 updates by @dependabot[bot] in [#141](https://github.com/arkemis/arke/pull/141)
@@ -53,10 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.1] - 2026-04-30
 
+
 ### Removed
 - Remove warning in arke system for unreachable clause by @vittorio-reinaudo in [#134](https://github.com/arkemis/arke/pull/134)
 
 ## [0.6.0] - 2026-04-14
+
 
 ### Changed
 - Update_key which run jsonbset by @ErikFerrari in [#129](https://github.com/arkemis/arke/pull/129)
@@ -66,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * @github-actions[bot] made their first contribution
 
 ## [0.5.0] - 2026-04-01
+
+### Breaking changes
+- File caching using genserver by @ErikFerrari in [#120](https://github.com/arkemis/arke/pull/120)
+
 
 ### Added
 - Add changelog by @ErikFerrari in [#132](https://github.com/arkemis/arke/pull/132)
@@ -77,35 +92,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.5] - 2026-02-23
 
+
 ### Fixed
 - Seed project merge group by @vittorio-reinaudo
 
 ## [0.4.4] - 2026-01-20
+
 
 ### Fixed
 - Ignore other columns during import by @ErikFerrari in [#128](https://github.com/arkemis/arke/pull/128)
 
 ## [0.4.3] - 2025-08-07
 
+
 ### Fixed
 - Load metadata by @ErikFerrari in [#126](https://github.com/arkemis/arke/pull/126)
 
 ## [0.4.2] - 2025-07-22
+
 
 ### Changed
 - Return struct format for link_ref parameter by @ilyichv in [#125](https://github.com/arkemis/arke/pull/125)
 
 ## [0.4.1] - 2025-06-06
 
+
 ### Fixed
 - If file header different than requirement header return error by @ErikFerrari in [#124](https://github.com/arkemis/arke/pull/124)
 
 ## [0.4.0] - 2025-06-03
 
+
 ### Added
 - Add nested filters and order by @ilyichv in [#123](https://github.com/arkemis/arke/pull/123)
 
 ## [0.3.17] - 2025-04-10
+
 
 ### Fixed
 - Gh action by @ErikFerrari
@@ -115,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * @ made their first contribution in [#122](https://github.com/arkemis/arke/pull/122)
 
 ## [0.3.16] - 2025-02-14
+
 
 ### Changed
 - Changed current_resource to get_member by @Robbi-aka-Rob in [#117](https://github.com/arkemis/arke/pull/117)
@@ -128,30 +151,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.14] - 2024-12-18
 
+
 ### Added
 - Add type to link_manager by @vittorio-reinaudo in [#114](https://github.com/arkemis/arke/pull/114)
 
 ## [0.3.13] - 2024-11-26
+
 
 ### Fixed
 - Offset and limit defaults by @ErikFerrari in [#112](https://github.com/arkemis/arke/pull/112)
 
 ## [0.3.12] - 2024-10-25
 
+
 ### Fixed
 - On_unit_import and before_unit_import by @ErikFerrari
 
 ## [0.3.11] - 2024-10-24
+
 
 ### Changed
 - Export data endpoint by @vittorio-reinaudo in [#110](https://github.com/arkemis/arke/pull/110)
 
 ## [0.3.10] - 2024-09-03
 
+
 ### Changed
 - File storage generic by @vittorio-reinaudo in [#103](https://github.com/arkemis/arke/pull/103)
 
 ## [0.3.9] - 2024-08-12
+
 
 ### Added
 - Add type of parameter in export data tasks by @vittorio-reinaudo in [#102](https://github.com/arkemis/arke/pull/102)
@@ -161,10 +190,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.8] - 2024-08-02
 
+
 ### Added
 - Add overridable func for import by @ErikFerrari in [#101](https://github.com/arkemis/arke/pull/101)
 
 ## [0.3.7] - 2024-07-23
+
 
 ### Fixed
 - Form data undefined to nil by @ErikFerrari in [#98](https://github.com/arkemis/arke/pull/98)
@@ -172,15 +203,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.6] - 2024-06-26
 
+
 ### Changed
 - Align dev by @ErikFerrari in [#95](https://github.com/arkemis/arke/pull/95)
 
 ## [0.3.5] - 2024-06-21
 
+
 ### Changed
 - Lowercase parameter and its validation by @ErikFerrari in [#94](https://github.com/arkemis/arke/pull/94)
 
 ## [0.3.4] - 2024-06-07
+
 
 ### Changed
 - Parameter value arke by @ErikFerrari in [#93](https://github.com/arkemis/arke/pull/93)
@@ -190,10 +224,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.3] - 2024-05-29
 
+
 ### Fixed
 - Export_data by @ErikFerrari
 
 ## [0.3.2] - 2024-05-21
+
 
 ### Changed
 - Ignore logs in test env by @ErikFerrari in [#89](https://github.com/arkemis/arke/pull/89)
@@ -202,10 +238,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2024-05-14
 
+
 ### Changed
 - Handle public files by @ErikFerrari in [#85](https://github.com/arkemis/arke/pull/85)
 
 ## [0.3.0] - 2024-04-23
+
 
 ### Changed
 - Set version to v0.3.0 by @ErikFerrari
@@ -213,15 +251,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.33] - 2024-03-28
 
+
 ### Changed
 - Improved import function in system by @dorianmercatante
 
 ## [0.1.32] - 2024-03-15
 
+
 ### Changed
 - Import function for arke by @dorianmercatante
 
 ## [0.1.31] - 2024-02-01
+
 
 ### Changed
 - Set version to v0.1.31 by @ilyichv
@@ -231,15 +272,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.30] - 2024-01-31
 
+
 ### Fixed
 - Used utc now by @dorianmercatante
 
 ## [0.1.29] - 2024-01-31
 
+
 ### Fixed
 - Handle updated_at in query manager update function by @dorianmercatante
 
 ## [0.1.28] - 2024-01-30
+
 
 ### Added
 - Add versioning by mix version command by @ErikFerrari in [#80](https://github.com/arkemis/arke/pull/80)
@@ -250,6 +294,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.27] - 2024-01-17
 
+
 ### Changed
 - Set version to v0.1.27 by @ErikFerrari
 
@@ -258,15 +303,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.26] - 2023-12-22
 
+
 ### Changed
 - General fixes by @dorianmercatante
 
 ## [0.1.25] - 2023-12-12
 
+
 ### Changed
 - Adedd old_unit as parameter in on_update function handler by @dorianmercatante
 
 ## [0.1.24] - 2023-12-04
+
 
 ### Changed
 - Set version to v0.1.24 by @ilyichv
@@ -276,50 +324,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.23] - 2023-11-15
 
+
 ### Fixed
 - Fix form data update by @dorianmercatante
 
 ## [0.1.22] - 2023-11-08
+
 
 ### Fixed
 - Handle parameters links on update by @dorianmercatante
 
 ## [0.1.21] - 2023-10-27
 
+
 ### Removed
 - Remove load_links at false for links by @dorianmercatante
 
 ## [0.1.20] - 2023-10-26
+
 
 ### Fixed
 - Exclude arke_link from handle link units by @dorianmercatante
 
 ## [0.1.19] - 2023-10-26
 
+
 ### Changed
 - Handle arke file upload and load_files opts in struct encode by @dorianmercatante
 
 ## [0.1.18] - 2023-10-17
+
 
 ### Changed
 - Handled unit and arke functions and improved unit_manager macro by @dorianmercatante
 
 ## [0.1.17] - 2023-10-11
 
+
 ### Fixed
 - Used in gcp utils env and not config by @dorianmercatante
 
 ## [0.1.15] - 2023-10-05
+
 
 ### Fixed
 - Fixed hanlde link_parameters by @dorianmercatante
 
 ## [0.1.14] - 2023-10-05
 
+
 ### Changed
 - Handle arke file parameter by @dorianmercatante in [#63](https://github.com/arkemis/arke/pull/63)
 
 ## [0.1.12] - 2023-08-30
+
 
 ### Added
 - Add parameter to reset_password_token arke by @ErikFerrari in [#55](https://github.com/arkemis/arke/pull/55)
@@ -332,6 +390,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.11] - 2023-08-01
 
+
 ### Changed
 - Set version to v0.1.11 by @ilyichv
 - Handle link parameter direction by @ilyichv in [#57](https://github.com/arkemis/arke/pull/57)
@@ -341,6 +400,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Handle_link_parameters to pass id by @ilyichv in [#53](https://github.com/arkemis/arke/pull/53)
 
 ## [0.1.10] - 2023-07-20
+
 
 ### Added
 - Add no_whitespace parameter by @ilyichv in [#17](https://github.com/arkemis/arke/pull/17)
@@ -364,6 +424,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.8] - 2023-06-29
 
+
 ### Changed
 - Set version to v0.1.8 by @ilyichv
 
@@ -373,6 +434,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.7] - 2023-06-15
 
+
 ### Changed
 - Set version to v0.1.7 by @ErikFerrari
 
@@ -381,10 +443,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.6] - 2023-06-14
 
+
 ### Changed
 - Handle parameter_manager improvements by @dorianmercatante
 
 ## [0.1.5] - 2023-05-31
+
 
 ### Added
 - Add on_struct_encode overridable function for intercepting unit gets by @ilyichv in [#18](https://github.com/arkemis/arke/pull/18)
@@ -407,6 +471,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.4] - 2023-05-19
 
+
 ### Changed
 - Set version to v0.1.4 by @ErikFerrari
 - Change action by @ErikFerrari
@@ -416,13 +481,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.3] - 2023-05-18
 
+
 ### Added
 - Add publish to hex workflow by @ErikFerrari
 
 ### New Contributors
 * @ErikFerrari made their first contribution
 
-[0.6.5]: https://github.com/arkemis/arke/compare/v0.6.4...v0.6.5
+[0.7.0]: https://github.com/arkemis/arke/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/arkemis/arke/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/arkemis/arke/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/arkemis/arke/compare/v0.6.1...v0.6.2
