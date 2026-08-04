@@ -386,4 +386,31 @@ defmodule Arke.QueryManagerTest do
       assert QueryManager.pseudo_query(query).filters == query.filters
     end
   end
+
+  describe "create without an id" do
+    @uuid_v1 ~r/^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+    test "assigns a lowercase, dash-separated v1 uuid" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+
+      {:ok, unit} = QueryManager.create(:test_schema, arke_model, label: "no id given")
+
+      id = to_string(unit.id)
+
+      assert String.length(id) == 36
+      assert id =~ @uuid_v1
+    end
+
+    test "assigns a distinct id to each unit" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+
+      ids =
+        for _ <- 1..10 do
+          {:ok, unit} = QueryManager.create(:test_schema, arke_model, label: "no id given")
+          unit.id
+        end
+
+      assert length(Enum.uniq(ids)) == 10
+    end
+  end
 end
