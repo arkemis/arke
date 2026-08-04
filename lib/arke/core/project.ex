@@ -20,7 +20,7 @@ defmodule Arke.Core.Project do
 
   use Arke.System
 
-  @persistence Application.get_env(:arke, :persistence)
+  @persistence Application.compile_env(:arke, :persistence)
 
   arke id: :arke_project do
   end

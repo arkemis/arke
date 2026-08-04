@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
   alias Arke.QueryManager
   alias Arke.LinkManager
   alias Arke.Utils.ErrorGenerator, as: Error
-  alias Arke.Boundary.{ArkeManager, GroupManager}
+  alias Arke.Boundary.ArkeManager
 
   alias Arke.Core.Unit
   @decode_keys [:arke, :parameter, :group, :link]
@@ -378,7 +378,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
     # error means manager not found, create
     with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
          {:ok, model} <- get_manager(ArkeManager, :group, :group, project),
-         {:ok, unit} <- QueryManager.create(project, model, current) do
+         {:ok, _unit} <- QueryManager.create(project, model, current) do
       handle_group(t, project, error)
     else
       %Unit{} = group_model ->

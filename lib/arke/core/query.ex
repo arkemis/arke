@@ -425,7 +425,7 @@ defmodule Arke.Core.Query do
 
   def set_offset(query, offset) when is_integer(offset), do: %{query | offset: offset}
   # TODO Custom exception offset must be integer
-  def set_offset(query, offset), do: nil
+  def set_offset(_query, _offset), do: nil
 
   @doc """
   Define the limit of the query
@@ -449,5 +449,5 @@ defmodule Arke.Core.Query do
 
   def set_limit(query, limit) when is_integer(limit), do: %{query | limit: limit}
   # TODO Custom exception limit must be integer
-  def set_limit(query, limit), do: nil
+  def set_limit(_query, _limit), do: nil
 end

@@ -31,7 +31,7 @@ defmodule Arke.Core.Unit do
         metadata,
         inserted_at,
         updated_at,
-        __module__,
+        module,
         runtime_data \\ %{}
       ) do
     case check_id(id) do
@@ -47,7 +47,7 @@ defmodule Arke.Core.Unit do
           metadata: metadata,
           inserted_at: DatetimeHandler.parse_datetime(inserted_at, true),
           updated_at: DatetimeHandler.parse_datetime(updated_at, true),
-          __module__: __module__,
+          __module__: module,
           runtime_data: runtime_data
         )
     end
@@ -85,7 +85,7 @@ defmodule Arke.Core.Unit do
       metadata ->
         {inserted_at, opts} = Map.pop(opts, :inserted_at, nil)
         {updated_at, opts} = Map.pop(opts, :updated_at, nil)
-        {__module__, opts} = Map.pop(opts, :__module__, nil)
+        {module, opts} = Map.pop(opts, :__module__, nil)
         {runtime_data, opts} = Map.pop(opts, :runtime_data, %{})
 
         with {:ok, opts} <- ArkeManager.call_func(arke, :before_load, [opts, persistence_fn]) do
@@ -100,7 +100,7 @@ defmodule Arke.Core.Unit do
               metadata,
               inserted_at,
               updated_at,
-              __module__,
+              module,
               runtime_data
             )
 
@@ -110,24 +110,23 @@ defmodule Arke.Core.Unit do
     end
   end
 
-  def load_data(%{data: %{parameters: parameters}} = arke, unit_data, opts) do
+  def load_data(%{data: %{parameters: _parameters}} = arke, unit_data, opts) do
     Enum.reduce(ArkeManager.get_parameters(arke), unit_data, fn %{
-                                                                  id: parameter_id,
-                                                                  arke_id: parameter_type
+                                                                  id: _parameter_id,
+                                                                  arke_id: _parameter_type
                                                                 } = parameter,
                                                                 new_unit_data ->
       load_parameter_value(parameter, new_unit_data, opts)
     end)
   end
 
-  def load_parameter_value(%{id: :id} = _, data, opts), do: data
-  def load_parameter_value(%{id: :metadata} = _, data, opts), do: data
-  def load_parameter_value(%{id: :metadata} = _, data, opts), do: data
-  def load_parameter_value(%{id: :arke_id} = _, data, opts), do: data
-  def load_parameter_value(%{id: :inserted_at} = _, data, opts), do: data
-  def load_parameter_value(%{id: :updated_at} = _, data, opts), do: data
+  def load_parameter_value(%{id: :id} = _, data, _opts), do: data
+  def load_parameter_value(%{id: :metadata} = _, data, _opts), do: data
+  def load_parameter_value(%{id: :arke_id} = _, data, _opts), do: data
+  def load_parameter_value(%{id: :inserted_at} = _, data, _opts), do: data
+  def load_parameter_value(%{id: :updated_at} = _, data, _opts), do: data
 
-  def load_parameter_value(%{id: parameter_id, arke_id: parameter_type} = parameter, data, opts) do
+  def load_parameter_value(%{id: parameter_id, arke_id: _parameter_type} = parameter, data, opts) do
     value =
       get_data_value(Map.get(opts, parameter_id, nil))
       |> get_default_value(parameter)
@@ -137,7 +136,7 @@ defmodule Arke.Core.Unit do
   end
 
   def get_default_value(value, parameter) when is_nil(value), do: handle_default_value(parameter)
-  def get_default_value(value, parameter), do: value
+  def get_default_value(value, _parameter), do: value
 
   # Any parameter type is supported: its default lives in `data[:"default_#{arke_id}"]`
   defp handle_default_value(%{arke_id: arke_id, data: data})
@@ -173,7 +172,7 @@ defmodule Arke.Core.Unit do
   def update(unit, %{metadata: metadata} = args) when is_list(metadata),
     do: update(unit, Map.replace(args, :metadata, Enum.into(metadata, %{})))
 
-  def update(%{data: data, arke_id: arke_id} = unit, args) do
+  def update(%{data: _data, arke_id: arke_id} = unit, args) do
     {id, args} = Map.pop(args, :id, unit.id)
     {link, args} = Map.pop(args, :link, Map.get(unit, :link, nil))
     {metadata, args} = Map.pop(args, :metadata, unit.metadata)
@@ -203,7 +202,7 @@ defmodule Arke.Core.Unit do
         Map.put(final_unit_data, parameter_id, new_value)
       end)
 
-    Map.merge(unit.data, parsed_data, fn _k, udata, pdata -> pdata end)
+    Map.merge(unit.data, parsed_data, fn _k, _udata, pdata -> pdata end)
   end
 
   @spec generate_id() :: String.t()
@@ -240,30 +239,6 @@ defmodule Arke.Core.Unit do
       Map.put_new(data, Atom.to_string(id), %{
         :value => value,
         :datetime => DatetimeHandler.now(:datetime)
-      })
-
-  defp update_encoded_unit_data(_, data, _), do: data
-
-  defp handle_id(id) when is_nil(id), do: generate_id()
-  defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
-  defp handle_id(id) when is_binary(id), do: id
-  # TODO handle error
-  defp handle_id(id), do: id
-
-  def encode_unit_data(arke, data) do
-    Enum.reduce(data, %{}, fn {key, value}, new_map ->
-      parameter = ArkeManager.get_parameter(arke, key)
-      update_encoded_unit_data(parameter, new_map, value)
-    end)
-  end
-
-  defp update_encoded_unit_data(%{data: %{only_runtime: true}}, data, _), do: data
-
-  defp update_encoded_unit_data(%{id: id}, data, value),
-    do:
-      Map.put_new(data, Atom.to_string(id), %{
-        :value => value,
-        :datetime => Arke.DatetimeHandler.now(:datetime)
       })
 
   defp update_encoded_unit_data(_, data, _), do: data
@@ -308,7 +283,7 @@ defmodule Arke.Core.Unit do
   """
   @spec get_value(data :: %Arke.Core.Unit{}, arg2 :: atom() | String.t()) ::
           String.t() | boolean() | number() | list() | %{}
-  def get_value(%Arke.Core.Unit{data: data} = unit, parameter_id),
+  def get_value(%Arke.Core.Unit{data: data} = _unit, parameter_id),
     do: get_value(data, parameter_id)
 
   def get_value(data, parameter_id) when is_map(data) and is_atom(parameter_id) do
@@ -322,18 +297,6 @@ defmodule Arke.Core.Unit do
   def get_value(data, _parameter_id) when is_nil(data), do: {:error, "data can not be nil"}
   def get_value(data, parameter_id), do: Keyword.get(data, parameter_id, nil)
 
-  @doc """
-  Parse value to atom
-  ## Parameter
-    - value => string | any => value to parse
-    - arg => :atom | any => if atom the string will be converted to atom if not it will be returned same as given
-
-  ## Example
-      iex> Arke.Core.Unit.parse_value("label", :atom)
-
-  ## Return
-      :value
-  """
   @spec parse_value(
           value :: String.t() | boolean() | number() | list() | %{} | Date.t(),
           String.t()
@@ -376,7 +339,7 @@ defmodule Arke.Core.Unit do
        when is_binary(value) and arke_id in [:link, :string] do
     cleaned_string = String.trim_leading(String.trim_trailing(value, "]"), "[")
     list_result = cleaned_string |> String.split(~r/,/, trim: true)
-    cleaned_list = list_result |> Enum.map(&String.replace(&1, ~r/^['"]|['"]$/, ""))
+    _cleaned_list = list_result |> Enum.map(&String.replace(&1, ~r/^['"]|['"]$/, ""))
   end
 
   defp parse_value(value, %{arke_id: :integer}) when is_binary(value) do
@@ -403,7 +366,7 @@ defmodule Arke.Core.Unit do
 
   defp parse_value(value, _), do: value
 
-  defp get_data_value(%{"datetime" => datetime, "value" => value} = _), do: value
+  defp get_data_value(%{"datetime" => _datetime, "value" => value} = _), do: value
   defp get_data_value(value), do: value
 
   @doc """
