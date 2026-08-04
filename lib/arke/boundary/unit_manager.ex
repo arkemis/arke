@@ -19,7 +19,6 @@ defmodule Arke.Boundary.UnitManager do
       require Logger
       alias Arke.Core.Unit
       alias Arke.Utils.ErrorGenerator, as: Error
-      @compile {:parse_transform, :ms_transform}
 
       Module.register_attribute(__MODULE__, :manager_id, accumulate: false, persist: true)
 
@@ -48,12 +47,9 @@ defmodule Arke.Boundary.UnitManager do
       end
 
       def get_all(project \\ :arke_system) do
-        fun =
-          :ets.fun2ms(fn {{unit_id, project_id}, _unit} when project_id == project ->
-            {unit_id, project_id}
-          end)
+        spec = [{{{:"$1", project}, :_}, [], [{{:"$1", {:const, project}}}]}]
 
-        :ets.select(manager_id(), fun)
+        :ets.select(manager_id(), spec)
       end
 
       def get(unit_id, _) when is_nil(unit_id), do: nil
