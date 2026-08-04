@@ -33,15 +33,13 @@ defmodule Mix.Tasks.Arke.SeedProject do
     project: :string,
     all: :boolean,
     format: :string,
-    persistence: :string,
-    update: :boolean
+    persistence: :string
   ]
   @aliases [
     p: :project,
     A: :all,
     f: :format,
-    ps: :persistence,
-    u: :update
+    ps: :persistence
   ]
 
   @impl true
@@ -72,7 +70,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
     end
   end
 
-  defp app_to_start("arke_postgres"), do: [:ecto_sql, :postgrex]
+  defp app_to_start("arke_postgres"), do: [:ecto_sql, :postgrex, :arke_postgres]
   defp parse_persistence!(ps) when ps in @persistence_repo, do: ps
 
   defp parse_persistence!(ps),
@@ -81,10 +79,10 @@ defmodule Mix.Tasks.Arke.SeedProject do
         "Invalid persistence: `#{ps}`\nSupported persistence are: #{Enum.join(@persistence_repo, " | ")}"
       )
 
-  defp check_file(_arke_id, project, []), do: nil
+  defp check_file(_arke_id, _project, []), do: nil
 
   defp check_file(arke_id, project, data) do
-    if Mix.env() != :test do
+    unless Mix.env() == :test do
       {:ok, datetime} =
         Arke.Utils.DatetimeHandler.now(:datetime)
         |> Arke.Utils.DatetimeHandler.format("{ISO:Basic:Z}")
@@ -112,14 +110,15 @@ defmodule Mix.Tasks.Arke.SeedProject do
       )
 
   # this is for arke_postgres
-  defp start_repo(repo_module), do: repo_module.start_link()
+  defp start_repo(repo_module) do
+    repo_module.start_link()
+  end
 
   defp parse_file(opts) do
     Mix.shell().info("--- Parsing registry files --- ")
     format = opts[:format] || "json"
     check_format!(format)
     all = opts[:all] || false
-    ArkePostgres.init()
 
     # get core file to decode (arke) and append all other arke_deps registry files
     core_registry = arke_registry("arke", format, "all")
@@ -149,7 +148,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
 
     Enum.each(project_list, fn project ->
       if to_string(project) == "arke_system" do
-        write_data(project, core_data, core_parameter, core_arke, core_group, core_link, opts)
+        write_data(project, core_data, core_parameter, core_arke, core_group, core_link)
       else
         file_list = Path.wildcard("./lib/registry/*.#{format}")
         shared_arke_list = arke_registry("arke", format, "shared")
@@ -160,23 +159,13 @@ defmodule Mix.Tasks.Arke.SeedProject do
         arke_list = Map.get(raw_data, :arke, [])
         group_list = Map.get(raw_data, :group, [])
         link_list = Map.get(raw_data, :link, [])
-        write_data(project, core_data, parameter_list, arke_list, group_list, link_list, opts)
+        write_data(project, core_data, parameter_list, arke_list, group_list, link_list)
       end
     end)
   end
 
-  defp write_data(
-         input_project,
-         core_data,
-         parameter_list,
-         arke_list,
-         group_list,
-         link_list,
-         opts \\ []
-       ) do
+  defp write_data(input_project, core_data, parameter_list, arke_list, group_list, link_list) do
     project_key = to_string(input_project)
-    update = if project_key == "arke_system", do: false, else: opts[:update] || false
-
     # if the project is arke_system the managers have already been started so skip
     if project_key != "arke_system" do
       Mix.shell().info("--- Parsing registry files --- ")
@@ -195,10 +184,10 @@ defmodule Mix.Tasks.Arke.SeedProject do
       check_file("group_manager", project_key, error_group_manager)
     end
 
-    error_parameter = handle_parameter(parameter_list, input_project, [update: update], [])
-    error_arke = handle_arke(arke_list, input_project, [update: update], [])
-    error_group = handle_group(group_list, input_project, [update: update], [])
-    error_link = handle_link(link_list, input_project, [update: update], [])
+    error_parameter = handle_parameter(parameter_list, input_project, [])
+    error_arke = handle_arke(arke_list, input_project, [])
+    error_group = handle_group(group_list, input_project, [])
+    error_link = handle_link(link_list, input_project, [], :add)
     check_file("parameter", project_key, error_parameter)
     check_file("arke", project_key, error_arke)
     check_file("group", project_key, error_group)
@@ -265,7 +254,21 @@ defmodule Mix.Tasks.Arke.SeedProject do
 
       new_data =
         Enum.reduce(@decode_keys, %{}, fn key, acc ->
-          Map.put(acc, key, Map.get(data, key, []) ++ Map.get(json, key, []))
+          Map.get(data, key, [])
+          |> Enum.concat(Map.get(json, key, []))
+          |> Enum.reduce(%{}, fn
+            %{id: id} = map, acc ->
+              Map.update(acc, id, map, fn existing ->
+                Map.merge(existing, map)
+              end)
+
+            %{type: type, parent: parent, child: child} = map, acc ->
+              Map.update(acc, "#{type}_#{parent}_#{child}", map, fn existing ->
+                Map.merge(existing, map)
+              end)
+          end)
+          |> Map.values()
+          |> then(&Map.put(acc, key, &1))
         end)
 
       parse(t, format, new_data)
@@ -283,165 +286,126 @@ defmodule Mix.Tasks.Arke.SeedProject do
     end
   end
 
-  # tutti i file parsati quindi proseguire
-  defp parse([], format, data), do: data
+  # all files parsed, proceed
+  defp parse([], _format, data), do: data
 
-  defp handle_parameter([%{id: id, label: nil} = current | t], project, opts, error),
-    do:
-      handle_parameter(
-        [Map.put(current, :label, String.capitalize(id)) | t],
-        project,
-        opts,
-        error
-      )
+  defp handle_parameter([%{id: id, label: nil} = current | t], project, error),
+    do: handle_parameter([Map.put(current, :label, String.capitalize(id)) | t], project, error)
 
   defp handle_parameter(
          [%{id: id, type: type} = current | t],
          project,
-         opts,
          error
        ) do
     Mix.shell().info("--- Creating parameter #{id} --- ")
 
-    with nil <- QueryManager.get_by(id: id, project: project, arke_id: type),
-         %Unit{} = model <- ArkeManager.get(String.to_atom(type), project),
+    with {:ok, model} <- get_manager(ArkeManager, :parameter, String.to_atom(type), project),
          {:ok, _unit} <- QueryManager.create(project, model, current) do
-      handle_parameter(t, project, opts, error)
+      handle_parameter(t, project, error)
     else
-      nil ->
-        handle_parameter(
-          t,
-          project,
-          opts,
-          parse_error(create_error(:parameter, "manager does not exists for: `#{id}`"), error)
-        )
-
       %Unit{} ->
         handle_parameter(
           t,
           project,
-          opts,
-          parse_error(create_error(:parameter, "Record already exists in db for: `#{id}`"), error)
+          parse_error(Error.create(:parameter, "Record already exists in db for: `#{id}`"), error)
         )
 
-      {:error, err} ->
-        handle_parameter(t, project, opts, parse_error(err, error, id))
+      {:error, _} = err ->
+        handle_parameter(t, project, parse_error(err, error, id))
 
       _err ->
         handle_parameter(
           t,
           project,
-          opts,
-          parse_error(create_error(:parameter, "Something went wrong for: `#{id}`"), error)
+          parse_error(Error.create(:parameter, "Something went wrong for: `#{id}`"), error)
         )
     end
   end
 
-  defp handle_parameter([_current | t], project, opts, error) do
+  defp handle_parameter([_current | t], project, error) do
     handle_parameter(
       t,
       project,
-      opts,
-      parse_error(create_error(:parameter, "Missing parameter `id` or `type`"), error)
+      parse_error(Error.create(:parameter, "Missing parameter `id` or `type`"), error)
     )
   end
 
-  defp handle_parameter([], _project, _opts, error), do: error
+  defp handle_parameter([], _project, error), do: error
 
-  defp handle_arke(list, project, opts \\ [], error \\ [])
-
-  defp handle_arke([%{id: id, label: nil} = current | t], project, opts, error),
+  defp handle_arke([%{id: id, label: nil} = current | t], project, error),
     do: handle_arke([Map.put(current, "label", String.capitalize(id)) | t], project, error)
 
   defp handle_arke(
          [%{id: id} = current | t],
          project,
-         opts,
          error
        ) do
     Mix.shell().info("--- Creating arke #{id} --- ")
     {parameter, new_data} = Map.pop(current, :parameters, [])
-    update = opts[:update] || false
+    parameter_error_msg = "#{id}_parameter_association"
 
-    with nil <- QueryManager.get_by(id: id, project: project, arke_id: "arke"),
-         %Unit{} = model <- ArkeManager.get(:arke, project),
+    # error means manager not found, create
+    with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
+         {:ok, model} <- get_manager(ArkeManager, :arke, :arke, project),
          {:ok, unit} <- QueryManager.create(project, model, new_data),
-         error <- link_parameter(parameter, unit, project, error) do
-      handle_arke(t, project, opts, error)
+         normalized_parameter <- normalize_link_list(parameter, unit, "parameter"),
+         _ <- Mix.shell().info("--- Adding parameters to arke #{id} --- "),
+         link_parameter_error <- handle_link(normalized_parameter, project, [], :add) do
+      parameter_errors = handle_list_errors(link_parameter_error, parameter_error_msg, error)
+      handle_arke(t, project, parameter_errors)
     else
-      nil ->
-        handle_arke(
-          t,
-          project,
-          opts,
-          parse_error(create_error(:arke, "manager does not exists for: `#{id}`"), error)
-        )
+      %Unit{} = arke_model ->
+        Mix.shell().info("--- Updating parameters for arke #{id} --- ")
 
-      %Unit{} = unit when update ->
-        error = link_parameter(parameter, unit, project, error)
-        handle_arke(t, project, opts, error)
+        handle_arke_parameters(arke_model, parameter)
+        |> handle_list_errors(parameter_error_msg, error)
+        |> then(&handle_arke(t, project, &1))
 
-      %Unit{} = _unit ->
-        handle_arke(
-          t,
-          project,
-          opts,
-          parse_error(create_error(:arke, "Record already exists in db for: `#{id}`"), error)
-        )
-
-      {:error, err} ->
-        handle_arke(t, project, opts, [err | error])
+      {:error, _} = err ->
+        handle_arke(t, project, [err | error])
     end
   end
 
-  defp handle_arke([], _project, _opts, error), do: error
+  defp handle_arke([], _project, error), do: error
 
   defp handle_group(
          [%{id: id} = current | t],
          project,
-         opts,
          error
        ) do
     Mix.shell().info("--- Creating group #{id} --- ")
 
-    with nil <- QueryManager.get_by(id: id, project: project, arke_id: :group),
-         %Unit{} = model <- ArkeManager.get(:group, project),
+    # error means manager not found, create
+    with nil <- QueryManager.get_by(project: project, id: String.to_atom(id)),
+         {:ok, model} <- get_manager(ArkeManager, :group, :group, project),
          {:ok, unit} <- QueryManager.create(project, model, current) do
-      handle_group(t, project, opts, error)
+      handle_group(t, project, error)
     else
-      nil ->
-        handle_group(
-          t,
-          project,
-          opts,
-          parse_error(create_error(:arke, "manager does not exists for: `#{id}`"), error)
-        )
+      %Unit{} = group_model ->
+        Mix.shell().info("--- Updating arkes for group #{id} --- ")
+        arke_list = current.arke_list
 
-      %Unit{} = _unit ->
-        handle_group(
-          t,
-          project,
-          opts,
-          parse_error(create_error(:arke, "Record already exists in db for: `#{id}`"), error)
-        )
+        handle_group_members(group_model, arke_list)
+        |> then(&handle_group(t, project, error ++ &1))
 
-      {:error, err} ->
-        handle_group(t, project, opts, [err | error])
+      {:error, _} = err ->
+        handle_group(t, project, [err | error])
     end
   end
 
-  defp handle_group([], _project, _opts, error), do: error
-  defp handle_link(_data, _project, _opts, _error \\ [])
+  defp handle_group([], _project, error), do: error
 
   defp handle_link(
          [%{type: type, parent: parent, child: child} = current | t],
          project,
-         opts,
-         error
+         error,
+         action
        ) do
-    Mix.shell().info("--- Creating link from #{parent} to #{child} --- ")
+    {link_manager_fn, msg} = get_link_manager_fn(action, parent, child)
 
-    case LinkManager.add_node(
+    Mix.shell().info(msg)
+
+    case link_manager_fn.(
            project,
            parent,
            child,
@@ -449,65 +413,75 @@ defmodule Mix.Tasks.Arke.SeedProject do
            Map.get(current, :metadata, %{})
          ) do
       {:ok, _unit} ->
-        handle_link(t, project, opts, error)
+        handle_link(t, project, error, action)
 
       {:error, link_error} ->
         handle_link(
           t,
           project,
-          opts,
-          [link_error | error]
+          [link_error | error],
+          action
         )
     end
   end
 
-  defp handle_link([current | t], project, opts, error),
+  defp handle_link([current | t], project, error, action),
     do:
       handle_link(
         t,
         project,
-        parse_error(create_error(:link, "invalid parameters for #{current}}"), error)
+        parse_error(Error.create(:link, "invalid parameters for #{current}}"), error),
+        action
       )
 
-  defp handle_link([], _project, _opts, error), do: error
+  defp handle_link([], _project, error, _action), do: error
 
-  defp link_parameter(p_list, arke, project, error) do
-    Mix.shell().info("--- Adding parameters to arke #{arke.id} --- ")
+  defp get_link_manager_fn(:add, parent, child),
+    do: {&LinkManager.add_node/5, "--- Creating link from #{parent} to #{child} --- "}
 
-    param_link =
-      Enum.reduce(p_list, [], fn parameter, acc ->
-        [
-          %{
-            child: Map.get(parameter, :id),
-            parent: to_string(arke.id),
-            metadata: Map.get(parameter, :metadata, %{}),
-            type: "parameter"
-          }
-          | acc
-        ]
+  defp get_link_manager_fn(:delete, parent, child),
+    do: {&LinkManager.delete_node/5, "--- Deleting link from #{parent} to #{child} --- "}
+
+  defp handle_arke_parameters(
+         %{metadata: %{project: project}} = current_arke_model,
+         parameter_list
+       ) do
+    link_type = "parameter"
+
+    current_linked_parameters =
+      ArkeManager.get_parameters(current_arke_model)
+      |> Enum.reduce([], fn
+        %{id: parameter_id, data: %{persistence: "arke_parameter"}}, acc ->
+          [to_string(parameter_id) | acc]
+
+        # exclude table_columns which can not be removed without proper migrations
+        _parameter, acc ->
+          acc
       end)
 
-    new_error = handle_link(param_link, project, [], [])
+    right_parameter_list = Enum.map(parameter_list, &(Map.get(&1, :id) |> to_string()))
 
-    [%{"#{arke.id}_parameter_association": new_error} | error]
+    parameter_to_remove =
+      (current_linked_parameters -- right_parameter_list)
+      |> normalize_link_list(current_arke_model, link_type)
+
+    ids_to_add = right_parameter_list -- current_linked_parameters
+
+    parameter_to_add =
+      Enum.filter(parameter_list, &Enum.member?(ids_to_add, to_string(&1.id)))
+      |> normalize_link_list(current_arke_model, link_type)
+
+    add_parameter_error = handle_link(parameter_to_add, project, [], :add)
+
+    delete_parameter_error =
+      handle_link(parameter_to_remove, project, [], :delete)
+
+    add_parameter_error ++ delete_parameter_error
   end
 
-  defp add_arke_to_group(group, project) do
-    Mix.shell().info("--- Adding arkes to group #{group.id} --- ")
-    arke_list = Map.get(group, :arke_list, [])
-
-    group_link =
-      Enum.reduce(arke_list, [], fn arke, acc ->
-        [
-          %{
-            parent: to_string(group.id),
-            child: to_string(Map.get(arke, :id)),
-            metadata: Map.get(arke, :metadata, %{}),
-            type: "group"
-          }
-          | acc
-        ]
-      end)
+  defp handle_group_members(%{metadata: %{project: project}} = current_group_model, arke_list) do
+    arke_to_remove_ids = current_group_model.data.arke_list -- arke_list
+    arke_to_add_ids = arke_list -- current_group_model.data.arke_list
 
     # every group has a `arke_list` field that stores the arke ids it contains.
     # Must be updated and the link will be handled automatically
@@ -521,16 +495,40 @@ defmodule Mix.Tasks.Arke.SeedProject do
     []
   end
 
-  defp create_error(context, msg) do
-    {:error, msg} = Error.create(context, msg)
-    msg
+  defp normalize_link_list(link_list, %{id: parent_id} = _arke_parent, type) do
+    Enum.map(link_list, fn child ->
+      {child_id, metadata} = get_link_data(child)
+
+      %{
+        parent: to_string(parent_id),
+        child: child_id,
+        metadata: metadata,
+        type: type
+      }
+    end)
   end
 
-  defp parse_error(error_message, error_accumulator) when is_list(error_message),
+  defp get_link_data(%{id: child_id} = child),
+    do: {to_string(child_id), Map.get(child, :metadata, %{})}
+
+  defp get_link_data(child_id), do: {to_string(child_id), %{}}
+
+  defp parse_error({:error, error_message}, error_accumulator) when is_list(error_message),
     do: error_message ++ error_accumulator
 
-  defp parse_error(error_message, error_accumulator), do: [error_message | error_accumulator]
+  defp parse_error({:error, error_message}, error_accumulator),
+    do: [error_message | error_accumulator]
 
-  defp parse_error(error_message, error_accumulator, id),
+  defp parse_error({:error, error_message}, error_accumulator, id),
     do: [%{create: id, error: error_message} | error_accumulator]
+
+  defp get_manager(manager, context, id, project) do
+    case manager.get(id, project) do
+      %Unit{} = model -> {:ok, model}
+      nil -> Error.create(context, "manager does not exists for: `#{id}`")
+    end
+  end
+
+  defp handle_list_errors([], _msg, error), do: error
+  defp handle_list_errors(new_list_error, msg, error), do: [%{msg => new_list_error} | error]
 end
