@@ -509,6 +509,88 @@ defmodule Arke.ValidatorTest do
     end
   end
 
+  describe "multiple parameters" do
+    setup do
+      {:ok, arke: ArkeManager.get(:arke_test_support, :arke_system)}
+    end
+
+    test "accepts a list of admitted values", %{arke: arke} do
+      assert Arke.Validator.validate_parameter(arke, :enum_integer_support, [1, 3], :test_schema) ==
+               {[1, 3], []}
+    end
+
+    test "rejects a list holding the wrong type", %{arke: arke} do
+      assert Arke.Validator.validate_parameter(
+               arke,
+               :enum_integer_support,
+               [1, "two"],
+               :test_schema
+             ) ==
+               {[1, "two"],
+                [
+                  {[1, "two"], "enum_integer_support must be a list of integer"},
+                  {"[1,two]", "enum_integer_support must be a list of integer "}
+                ]}
+    end
+
+    test "rejects a list holding a value outside the enum", %{arke: arke} do
+      assert Arke.Validator.validate_parameter(
+               arke,
+               :enum_integer_support,
+               [1, 9],
+               :test_schema
+             ) ==
+               {[1, 9], [{"allowed values for enum_integer_support are", [1, 2, 3, 4, 5]}]}
+    end
+
+    test "rejects a list on a parameter that is not multiple" do
+      arke_string = ArkeManager.get(:string, :arke_system)
+
+      parameter =
+        Unit.load(arke_string, %{
+          id: :test_not_multiple,
+          label: "Not Multiple",
+          min_length: nil,
+          max_length: nil
+        })
+
+      ParameterManager.create(parameter, :test_schema)
+
+      assert Arke.Validator.validate_parameter(
+               arke_string,
+               ParameterManager.get(:test_not_multiple, :test_schema),
+               ["a", "b"],
+               :test_schema
+             ) == {["a", "b"], [{"multiple values are not allowed for", :test_not_multiple}]}
+    end
+
+    test "a list on a non-multiple number parameter raises before it can be reported", %{
+      arke: arke
+    } do
+      # parse_value/2 hands the list straight to Integer.parse/2, so the
+      # "multiple values are not allowed for" error is unreachable here.
+      assert_raise FunctionClauseError, fn ->
+        Arke.Validator.validate_parameter(arke, :integer_support, [1, 2], :test_schema)
+      end
+    end
+
+    test "an empty enum admits anything" do
+      arke_string = ArkeManager.get(:string, :arke_system)
+
+      parameter =
+        Unit.load(arke_string, %{id: :test_empty_enum, label: "Empty Enum", values: []})
+
+      ParameterManager.create(parameter, :test_schema)
+
+      assert Arke.Validator.validate_parameter(
+               arke_string,
+               ParameterManager.get(:test_empty_enum, :test_schema),
+               "anything",
+               :test_schema
+             ) == {"anything", []}
+    end
+  end
+
   describe "default_values" do
     test "string" do
       # Create string
