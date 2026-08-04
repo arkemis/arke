@@ -58,7 +58,7 @@ defmodule Arke.Core.Parameter do
   group id: "parameter" do
   end
 
-  def on_unit_create(_arke, %{id: id, metadata: %{project: project}} = unit) do
+  def on_unit_create(_arke, %{id: _id, metadata: %{project: _project}} = unit) do
     ParameterManager.create(unit)
     {:ok, unit}
   end
@@ -68,7 +68,7 @@ defmodule Arke.Core.Parameter do
     {:ok, unit}
   end
 
-  def on_unit_delete(_, %{id: id, metadata: %{project: project}} = unit) do
+  def on_unit_delete(_, %{id: _id, metadata: %{project: _project}} = unit) do
     ParameterManager.remove(unit)
     {:ok, unit}
   end
@@ -94,7 +94,6 @@ defmodule Arke.Core.Parameter.String do
   ## Return
       %Arke.Core.Parameter.String{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -127,7 +126,6 @@ defmodule Arke.Core.Parameter.Integer do
     ## Return
         %Arke.Core.Parameter.Float{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -160,7 +158,6 @@ defmodule Arke.Core.Parameter.Float do
     ## Return
         %Arke.Core.Parameter.Float{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -189,7 +186,6 @@ defmodule Arke.Core.Parameter.Boolean do
   ## Return
       %Arke.Core.Parameter.Boolean{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -213,7 +209,6 @@ defmodule Arke.Core.Parameter.Dict do
   ## Return
       %Arke.Core.Parameter.Dict{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -237,7 +232,6 @@ defmodule Arke.Core.Parameter.List do
   ## Return
       %Arke.Core.Parameter.Dict{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -269,7 +263,6 @@ defmodule Arke.Core.Parameter.Date do
         %Arke.Core.Parameter.Date{}
   """
 
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -300,7 +293,6 @@ defmodule Arke.Core.Parameter.Time do
     ## Return
         %Arke.Core.Parameter.Time{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -334,7 +326,6 @@ defmodule Arke.Core.Parameter.DateTime do
         %Arke.Core.Parameter.DateTime{}
   """
 
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -358,7 +349,6 @@ defmodule Arke.Core.Parameter.Link do
   ## Return
       %Arke.Core.Parameter.Link{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -375,7 +365,6 @@ defmodule Arke.Core.Parameter.Dynamic do
   ## Return
       %Arke.Core.Parameter.Dynamic{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
 
   use Arke.System
@@ -392,7 +381,6 @@ defmodule Arke.Core.Parameter.Binary do
   ## Return
       %Arke.Core.Parameter.Binary{}
   """
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ParameterManager
   use Arke.System
 

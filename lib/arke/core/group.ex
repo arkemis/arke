@@ -24,7 +24,7 @@ defmodule Arke.Core.Group do
   arke do
   end
 
-  def on_create(arke, unit) do
+  def on_create(_arke, unit) do
     group = Unit.update(unit, arke_list: [])
     GroupManager.create(group)
     {:ok, unit}

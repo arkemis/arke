@@ -24,16 +24,16 @@ defmodule Arke.Boundary.GroupManager do
 
   defp check_module(unit), do: unit
 
-  def before_create(%{id: id, data: data, metadata: unit_metadata} = unit, project) do
+  def before_create(%{id: _id, data: _data, metadata: _unit_metadata} = unit, project) do
     unit = check_module(unit)
     {unit, project}
   end
 
-  def get_arke_list(%{data: data, metadata: %{project: project}} = unit) do
+  def get_arke_list(%{data: data, metadata: %{project: project}} = _unit) do
     Enum.reduce(data.arke_list, [], fn %{id: arke_id, metadata: arke_metadata} = _,
                                        new_arke_list ->
       case init_arke(project, arke_id, arke_metadata) do
-        {:error, msg} -> new_arke_list
+        {:error, _msg} -> new_arke_list
         arke -> [arke | new_arke_list]
       end
     end)
@@ -43,10 +43,7 @@ defmodule Arke.Boundary.GroupManager do
     Error.create(:group, "invalid unit")
   end
 
-  def get_arke(%{id: id} = unit, project, arke_id),
-    do: get_arke(id, project, arke_id)
-
-  def get_arke(%{id: id, metadata: %{project: project}} = unit, arke_id),
+  def get_arke(%{id: id} = _unit, project, arke_id),
     do: get_arke(id, project, arke_id)
 
   def get_arke(unit_id, project, arke_id) when is_binary(arke_id),
@@ -63,13 +60,16 @@ defmodule Arke.Boundary.GroupManager do
                  f.id == arke_id
                end),
              do: arke,
-             else: ({:error, msg} -> nil)
+             else: ({:error, _msg} -> nil)
     end
   end
 
-  def get_arke(unit_id, project, %Unit{} = parameter), do: parameter
+  def get_arke(_unit_id, _project, %Unit{} = parameter), do: parameter
 
-  def get_groups_by_arke(%{id: id, metadata: %{project: project}} = arke),
+  def get_arke(%{id: id, metadata: %{project: project}} = _unit, arke_id),
+    do: get_arke(id, project, arke_id)
+
+  def get_groups_by_arke(%{id: id, metadata: %{project: project}} = _arke),
     do: get_groups_by_arke(id, project)
 
   def get_groups_by_arke(arke_id, project) do
@@ -88,8 +88,8 @@ defmodule Arke.Boundary.GroupManager do
 
   def get_parameters(group_id, project), do: get(group_id, project) |> get_parameters
 
-  def get_parameters(%{id: id, metadata: %{project: project}} = group) do
-    parameters =
+  def get_parameters(%{id: _id, metadata: %{project: project}} = group) do
+    _parameters =
       get_arke_list(group)
       |> get_group_parameters(project)
       |> init_parameters_by_ids(project)
@@ -117,7 +117,7 @@ defmodule Arke.Boundary.GroupManager do
 
   defp link_init(project, :arke_list, child_id, metadata) do
     case init_arke(project, child_id, metadata) do
-      {:error, msg} -> %{id: child_id, metadata: metadata}
+      {:error, _msg} -> %{id: child_id, metadata: metadata}
       p -> p
     end
   end

@@ -40,14 +40,12 @@ defmodule Arke.QueryManager do
   alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager}
   alias Arke.Validator
   alias Arke.LinkManager
-  alias Arke.QueryManager
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
   alias Arke.Errors.ArkeError
   alias Arke.Utils.ErrorGenerator, as: Error
-  alias Arke.Core.{Arke, Unit, Query, Parameter}
+  alias Arke.Core.{Arke, Unit, Query}
 
-  @persistence Application.get_env(:arke, :persistence)
-  @record_fields [:id, :data, :metadata, :inserted_at, :updated_at]
+  @persistence Application.compile_env(:arke, :persistence)
 
   @type func_return() :: {:ok, Unit.t()} | Error.t()
   @type operator() ::
@@ -79,7 +77,7 @@ defmodule Arke.QueryManager do
     project = Keyword.get(opts, :project)
     arke = get_arke(Keyword.get(opts, :arke), project)
     distinct = Keyword.get(opts, :distinct, nil)
-    query = Query.new(arke, project, distinct)
+    _query = Query.new(arke, project, distinct)
   end
 
   @doc """
@@ -117,7 +115,7 @@ defmodule Arke.QueryManager do
   defp parse_link_depth(depth) when is_integer(depth), do: depth
 
   # TODO exception if depth is not an integer
-  defp parse_link_depth(depth), do: 500
+  defp parse_link_depth(_depth), do: 500
 
   defp parse_link_direction(direction) when is_binary(direction),
     do: String.to_existing_atom(direction)
@@ -162,7 +160,7 @@ defmodule Arke.QueryManager do
   defp handle_link_parameters_unit(%{id: :parameter_value} = _, unit), do: {:ok, unit}
 
   defp handle_link_parameters_unit(
-         %{data: parameters} = arke,
+         %{data: _parameters} = arke,
          %{metadata: %{project: project}} = unit
        ) do
     {errors, link_units} =
@@ -178,14 +176,14 @@ defmodule Arke.QueryManager do
                Unit.get_value(unit, p.id)
              ) do
           {:ok, parameter, %Unit{} = link_unit} -> {errors, [{parameter, link_unit} | link_units]}
-          {:ok, parameter, link_unit} -> {errors, link_units}
+          {:ok, _parameter, _link_unit} -> {errors, link_units}
           {:error, e} -> {[e | errors], link_units}
         end
       end)
 
     case length(errors) > 0 do
       true ->
-        Enum.map(link_units, fn {p, u} ->
+        Enum.map(link_units, fn {_p, u} ->
           delete(project, u)
         end)
 
@@ -201,11 +199,11 @@ defmodule Arke.QueryManager do
     end
   end
 
-  defp handle_create_on_link_parameters_unit(project, unit, parameter, arke, value)
+  defp handle_create_on_link_parameters_unit(_project, _unit, parameter, _arke, value)
        when is_nil(value),
        do: {:ok, parameter, value}
 
-  defp handle_create_on_link_parameters_unit(project, unit, parameter, arke, value)
+  defp handle_create_on_link_parameters_unit(_project, _unit, parameter, _arke, value)
        when is_binary(value),
        do: {:ok, parameter, value}
 
@@ -404,7 +402,7 @@ defmodule Arke.QueryManager do
   def and_(query, negate, filters) when is_list(filters),
     do: Query.add_filter(query, :and, negate, parse_base_filters(query, filters))
 
-  def and_(_query, _negate, filters), do: raise("filters must be a list")
+  def and_(_query, _negate, _filters), do: raise("filters must be a list")
 
   @doc """
   Add an `:or` logic to a query
@@ -425,7 +423,7 @@ defmodule Arke.QueryManager do
   def or_(query, negate, filters) when is_list(filters),
     do: Query.add_filter(query, :or, negate, parse_base_filters(query, filters))
 
-  def or_(_query, _negate, filters), do: raise("filters must be a list")
+  def or_(_query, _negate, _filters), do: raise("filters must be a list")
 
   defp parse_base_filters(query, filters) do
     Enum.reduce(filters, [], fn
@@ -563,7 +561,7 @@ defmodule Arke.QueryManager do
     do: handle_filter(query, :group_id, :eq, value, negate)
 
   defp handle_filter(query, :group_id, :eq, value, negate) do
-    %{id: id} = group = get_group(value, query.project)
+    %{id: _id} = group = get_group(value, query.project)
 
     arke_list =
       Enum.map(GroupManager.get_arke_list(group), fn a ->
@@ -589,9 +587,9 @@ defmodule Arke.QueryManager do
     Query.add_filter(query, get_parameter(query, parameter), operator, value, negate)
   end
 
-  defp handle_filter_group(query, group, arke_list, negate) when is_nil(group), do: query
+  defp handle_filter_group(query, group, _arke_list, _negate) when is_nil(group), do: query
 
-  defp handle_filter_group(query, group, arke_list, negate),
+  defp handle_filter_group(query, _group, arke_list, negate),
     do: handle_filter(query, :arke_id, :in, arke_list, negate)
 
   @doc """
@@ -737,23 +735,25 @@ defmodule Arke.QueryManager do
 
   defp handle_arke_filter(query), do: query
 
-  defp get_parameter_operator(arke, [key, operator]), do: {key, String.to_existing_atom(operator)}
-  defp get_parameter_operator(arke, [key]), do: {key, :eq}
+  defp get_parameter_operator(_arke, [key, operator]),
+    do: {key, String.to_existing_atom(operator)}
+
+  defp get_parameter_operator(_arke, [key]), do: {key, :eq}
   # TODO custom exception
   defp get_parameter_operator(_, _), do: nil
 
-  defp get_parameter(%{arke: nil, project: project} = query, %{id: id} = _parameter),
+  defp get_parameter(%{arke: nil, project: project} = _query, %{id: id} = _parameter),
     do: ParameterManager.get(id, project)
 
-  defp get_parameter(%{arke: nil, project: project} = query, key),
+  defp get_parameter(%{arke: nil, project: project} = _query, key),
     do: ParameterManager.get(key, project)
 
-  defp get_parameter(%{arke: arke, project: project} = query, key) do
+  defp get_parameter(%{arke: arke, project: project} = _query, key) do
     ArkeManager.get_parameter(arke, project, key)
   end
 
   defp handle_link_parameters(
-         %{arke_id: arke_id, metadata: %{project: project}, data: new_data, id: id} = unit,
+         %{arke_id: arke_id, metadata: %{project: project}, data: new_data, id: _id} = unit,
          old_data
        ) do
     arke = ArkeManager.get(arke_id, project)
@@ -866,7 +866,7 @@ defmodule Arke.QueryManager do
   # Function to get only the parameter id from `handle_link_parameter`
   defp normalize_value(nil), do: nil
 
-  defp normalize_value(%{id: id} = value) do
+  defp normalize_value(%{id: id} = _value) do
     to_string(id)
   end
 
