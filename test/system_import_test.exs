@@ -12,7 +12,7 @@ defmodule Arke.SystemImportTest do
   @header ["string_support", "integer_support", "enum_integer_support"]
 
   setup do
-    path = Path.join(System.tmp_dir!(), "import.xlsx")
+    path = Path.join(System.tmp_dir!(), "import-#{System.unique_integer([:positive])}.xlsx")
     on_exit(fn -> File.rm(path) end)
     %{path: path}
   end

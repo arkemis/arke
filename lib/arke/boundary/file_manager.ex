@@ -67,6 +67,15 @@ defmodule Arke.Boundary.FileManager do
     :ok
   end
 
+  @doc """
+  Drops every cached entry. For test isolation, see `Arke.Test.Sandbox`.
+  """
+  @spec reset() :: :ok
+  def reset do
+    :ets.delete_all_objects(@table)
+    :ok
+  end
+
   @impl true
   def init(state) do
     :ets.new(@table, [:set, :named_table, :public, read_concurrency: true])

@@ -31,7 +31,7 @@ defmodule Arke.Test.Sandbox do
       end
   """
 
-  alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager}
+  alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager, FileManager}
 
   @managers [ParameterManager, ArkeManager, GroupManager]
 
@@ -47,11 +47,13 @@ defmodule Arke.Test.Sandbox do
 
   @doc """
   Rolls every manager back to the last `checkpoint/0` and empties the
-  in-memory persistence store.
+  in-memory persistence store and the file cache.
   """
   @spec restore() :: :ok
   def restore do
     Arke.Test.Persistence.reset()
+    # not a UnitManager: no checkpoint to roll back to, the cache starts empty
+    FileManager.reset()
 
     Enum.each(@managers, fn manager ->
       case :persistent_term.get({__MODULE__, manager}, nil) do
