@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-08-04
+
+### Breaking changes
+- `import_units/5` is now `import_units/4` and no longer receives a member; overrides of the old arity are never called, so update them to the new signature and fetch the member from the conn where one is needed. by @ilyichv in [#164](https://github.com/arkemis/arke/pull/164)
+- The minimum supported Elixir is now 1.16. by @ilyichv in [#161](https://github.com/arkemis/arke/pull/161)
+
+
+### Changed
+- Clear compiler warnings by @ilyichv in [#165](https://github.com/arkemis/arke/pull/165)
+- Format pass and lint CI leg by @ilyichv in [#162](https://github.com/arkemis/arke/pull/162)
+- Raise elixir floor to ~> 1.16 by @ilyichv in [#161](https://github.com/arkemis/arke/pull/161)
+
+### Fixed
+- Handle default value by @ErikFerrari in [#166](https://github.com/arkemis/arke/pull/166)
+- Drop ArkeAuth and ArkePostgres calls from the import macro by @ilyichv in [#164](https://github.com/arkemis/arke/pull/164)
+- Swap uuid for uniq by @ilyichv in [#163](https://github.com/arkemis/arke/pull/163)
+
 ## [0.7.0] - 2026-08-03
 
 ### Breaking changes
@@ -488,6 +505,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.8.0]: https://github.com/arkemis/arke/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/arkemis/arke/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/arkemis/arke/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/arkemis/arke/compare/v0.6.2...v0.6.3
