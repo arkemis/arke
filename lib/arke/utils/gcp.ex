@@ -27,7 +27,7 @@ defmodule Arke.Utils.Gcp do
 
   @storage_base_url "https://storage.googleapis.com"
 
-  def upload_file(file_name, file_data, opts \\ []) do
+  def upload_file(file_name, file_data, opts) do
     params =
       [uploadType: "multipart"] ++
         if(opts[:public], do: [predefinedAcl: "publicread"], else: [])
@@ -46,12 +46,12 @@ defmodule Arke.Utils.Gcp do
     |> handle_response(:json)
   end
 
-  def get_file(file_path, opts \\ []) do
+  def get_file(file_path, opts) do
     request(method: :get, url: object_url(file_path, opts))
     |> handle_response(:json)
   end
 
-  def get_public_url(%{data: %{name: name, path: path, extension: ext}} = unit, opts \\ []) do
+  def get_public_url(%{data: %{name: name, path: path, extension: _ext}} = _unit, opts) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
 
     {:ok,
@@ -60,7 +60,7 @@ defmodule Arke.Utils.Gcp do
 
   def get_public_url(_unit, _opts), do: Error.create(:storage, "invalid unit")
 
-  def delete_file(file_path, opts \\ []) do
+  def delete_file(file_path, opts) do
     request(method: :delete, url: object_url(file_path, opts))
     |> handle_response(:raw)
   end
@@ -71,7 +71,7 @@ defmodule Arke.Utils.Gcp do
   Requires service account credentials: metadata server and gcloud user
   credentials have no private key to sign with.
   """
-  def get_bucket_file_signed_url(file_path, opts \\ []) do
+  def get_bucket_file_signed_url(file_path, opts) do
     if opts[:service_account] do
       Logger.warning(
         "service_account option is ignored: urls are signed as the credentials' client_email"

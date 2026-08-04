@@ -163,4 +163,38 @@ defmodule Arke.Utils.GcpTest do
                {:error, [%{context: "storage", message: "invalid unit"}]}
     end
   end
+
+  describe "arities delegated from the behaviour reach the real implementation" do
+    setup do
+      System.put_env("DEFAULT_BUCKET", @bucket)
+      on_exit(fn -> System.delete_env("DEFAULT_BUCKET") end)
+    end
+
+    test "upload_file/2 performs the request" do
+      respond(200, ~s({"name":"#{@file_path}"}))
+
+      assert {:ok, _} = Gcp.upload_file(@file_path, "BYTES")
+
+      assert_received {:request, request}
+      assert request.method == :post
+    end
+
+    test "delete_file/1 performs the request" do
+      respond(204, "")
+
+      assert {:ok, %Req.Response{status: 204}} = Gcp.delete_file(@file_path)
+
+      assert_received {:request, request}
+      assert request.method == :delete
+    end
+
+    test "get_file/1 performs the request" do
+      respond(200, ~s({"name":"#{@file_path}"}))
+
+      assert {:ok, _} = Gcp.get_file(@file_path)
+
+      assert_received {:request, request}
+      assert request.method == :get
+    end
+  end
 end
