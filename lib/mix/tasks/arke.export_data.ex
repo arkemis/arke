@@ -20,13 +20,6 @@ defmodule Mix.Tasks.Arke.ExportData do
   """
 
   use Mix.Task
-  alias Arke.QueryManager
-  alias Arke.LinkManager
-  alias Arke.Utils.ErrorGenerator, as: Error
-  alias Arke.Boundary.{ArkeManager}
-
-  alias Arke.Core.Unit
-  @decode_keys [:arke, :parameter, :group, :link]
   @shortdoc "Export data from a project"
   @persistence_repo ["arke_postgres"]
 

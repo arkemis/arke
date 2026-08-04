@@ -19,7 +19,6 @@ defmodule Arke.Core.Arke do
   defstruct [:id, :label, :active, :type, :parameters]
 
   use Arke.System
-  alias Arke.Core.Parameter
   alias Arke.Boundary.ArkeManager
 
   arke id: :arke do
@@ -54,7 +53,7 @@ defmodule Arke.Core.Arke do
 
   def check_base_parameters(_, unit), do: unit
 
-  def base_parameters(arke, %{data: %{parameters: []}} = unit), do: base_parameters(arke)
+  def base_parameters(arke, %{data: %{parameters: []}} = _unit), do: base_parameters(arke)
   def base_parameters(_, unit), do: unit.data.parameters
 
   def base_parameters(arke) do

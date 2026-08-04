@@ -1,9 +1,7 @@
 defmodule Arke.Test.CreateArke do
   use Arke.System
-  alias Arke.Validator
   alias Arke.Core.Unit
-  alias Arke.Boundary.{ArkeManager, GroupManager, ParameterManager}
-  alias Arke.Core.Parameter
+  alias Arke.Boundary.{GroupManager, ParameterManager}
 
   arke id: :arke_test_support do
     parameter(:string_support, :string,
@@ -53,7 +51,7 @@ defmodule Arke.Test.CreateArke do
     end)
   end
 
-  defp base_parameter(opts \\ []) do
+  defp base_parameter(opts) do
     %{
       label: Keyword.get(opts, :label),
       format: Keyword.get(opts, :format, :attribute),

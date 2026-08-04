@@ -3,7 +3,11 @@ defmodule Arke.Boundary.ArkeTest do
 
   describe "ArkeManager" do
     test "get_all/0" do
-      assert is_list(ArkeManager.get_all()) == true and ArkeManager.get_all() != []
+      all = ArkeManager.get_all()
+
+      assert all != []
+      assert Enum.all?(all, fn {id, project} -> is_atom(id) and project == :arke_system end)
+      assert {:arke, :arke_system} in all
     end
 
     test "get_all/1" do

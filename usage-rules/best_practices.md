@@ -14,8 +14,8 @@
   `data->'field'->>'value'`.
 - Don't rely on `Manager.get_all/1` returning Units — it returns
   `{unit_id, project}` tuples.
-- Don't call legacy/dead code: `Arke.Examples.Starter`, `Unit.get_data/1`,
-  `Unit.data_as_klist/1` (they crash on real Units).
+- Don't call legacy/dead code: `Unit.get_data/1`, `Unit.data_as_klist/1`
+  (they crash on real Units).
 - Don't create multi-tenant data without seeding the project first — most
   `String.to_existing_atom` crashes and `nil` manager lookups trace back to
   an unseeded project or unloaded module.
