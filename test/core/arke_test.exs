@@ -56,4 +56,47 @@ defmodule Arke.Core.ArkeTest do
       end
     end
   end
+
+  describe "check_base_parameters/2" do
+    test "fills an empty parameter list with the table columns of the model" do
+      unit = Unit.load(ArkeManager.get(:arke, :arke_system), %{id: "test_base", parameters: []})
+
+      # arke_link is the model whose parameters carry persistence: table_column
+      parameters =
+        ArkeManager.get(:arke_link, :arke_system)
+        |> Arke.Core.Arke.check_base_parameters(unit)
+        |> Map.fetch!(:data)
+        |> Map.fetch!(:parameters)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert parameters == [:child_id, :metadata, :parent_id, :type]
+    end
+
+    test "leaves a non-empty parameter list untouched" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      parameters = [%{id: :label, metadata: %{}}]
+      unit = Unit.load(arke_model, %{id: "test_base", parameters: parameters})
+
+      assert Arke.Core.Arke.check_base_parameters(arke_model, unit) == unit
+      assert Enum.map(unit.data.parameters, & &1.id) == [:label]
+    end
+  end
+
+  describe "handle_link_init/2" do
+    test "wraps a binary id" do
+      assert Arke.Core.Arke.handle_link_init("label", :parameters) ==
+               %{id: :label, metadata: %{"parameter_id" => "parameters"}}
+    end
+
+    test "wraps an atom id" do
+      assert Arke.Core.Arke.handle_link_init(:label, :parameters) ==
+               %{id: :label, metadata: %{"parameter_id" => "parameters"}}
+    end
+
+    test "leaves anything else untouched" do
+      already_wrapped = %{id: :label, metadata: %{"parameter_id" => "parameters"}}
+      assert Arke.Core.Arke.handle_link_init(already_wrapped, :parameters) == already_wrapped
+    end
+  end
 end

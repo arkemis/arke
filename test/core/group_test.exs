@@ -34,5 +34,45 @@ defmodule Arke.Core.GroupTest do
 
       assert after_delete == nil
     end
+
+    test "update" do
+      group_model = ArkeManager.get(:group, :arke_system)
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      QueryManager.create(:test_schema, arke_model, %{id: "group_member", label: "Group Member"})
+
+      {:ok, group} =
+        QueryManager.create(:test_schema, group_model, %{
+          id: "group_test_update",
+          label: "Group"
+        })
+
+      {:ok, updated} = QueryManager.update(group, %{arke_list: ["group_member"]})
+
+      assert Enum.map(updated.data.arke_list, & &1.id) == [:group_member]
+
+      # Behaviour as it stands: `on_update` writes the arke_list, then the link
+      # parameter handling creates a "group" link whose `on_create` appends the
+      # same arke again. Pinned, not endorsed — the entry lands twice.
+      assert GroupManager.get(:group_test_update, :test_schema).data.arke_list
+             |> Enum.map(& &1.id)
+             |> Enum.sort() == [:group_member, :group_member]
+    end
+  end
+
+  describe "handle_link_init/2" do
+    test "wraps a binary id" do
+      assert Arke.Core.Group.handle_link_init("member", :arke_list) ==
+               %{id: :member, metadata: %{"parameter_id" => "arke_list"}}
+    end
+
+    test "wraps an atom id" do
+      assert Arke.Core.Group.handle_link_init(:member, :arke_list) ==
+               %{id: :member, metadata: %{"parameter_id" => "arke_list"}}
+    end
+
+    test "leaves anything else untouched" do
+      already_wrapped = %{id: :member, metadata: %{"parameter_id" => "arke_list"}}
+      assert Arke.Core.Group.handle_link_init(already_wrapped, :arke_list) == already_wrapped
+    end
   end
 end
