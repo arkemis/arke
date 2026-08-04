@@ -5,11 +5,6 @@ defmodule Mix.Tasks.Arke.SeedProjectTest do
 
   @project :seed_test
 
-  # The task discovers arke's registry through `EX_DEP_ARKE_PATH`, so pointing it
-  # at a tmp dir swaps the real registry for the fixture below. Managers are
-  # already bootstrapped from the real registry (see `test_helper.exs`) and
-  # manager lookups fall back to `:arke_system`, so `arke`, `group` and the
-  # parameter types still resolve.
   setup %{tmp_dir: tmp_dir} do
     shell = Mix.shell()
     Mix.shell(Mix.Shell.Quiet)
