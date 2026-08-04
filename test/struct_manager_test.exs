@@ -221,5 +221,208 @@ defmodule StructManagerTest do
 
       assert param_with_value.value == nil
     end
+
+    test "get_struct (error)" do
+      assert_raise RuntimeError, "Must pass a valid arke or unit", fn ->
+        StructManager.get_struct(%{arke_id: :test_arke_struct, data: %{}})
+      end
+    end
+
+    test "decode (error)" do
+      assert_raise RuntimeError, "Must pass valid data", fn ->
+        StructManager.decode(:test_schema, :test_arke_struct, %{}, :xml)
+      end
+    end
+  end
+
+  describe "StructManager link parameters" do
+    setup do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      link_model = ArkeManager.get(:link, :arke_system)
+      group_model = ArkeManager.get(:group, :arke_system)
+
+      for id <- ["struct_source", "struct_target"] do
+        QueryManager.create(:test_schema, arke_model, %{id: id, label: id})
+      end
+
+      QueryManager.create(:test_schema, group_model, %{id: "struct_group", label: "Struct Group"})
+
+      QueryManager.create(:test_schema, link_model, %{
+        id: "struct_link",
+        label: "Struct Link",
+        arke_or_group_id: "struct_target",
+        connection_type: "struct_conn",
+        direction: "child",
+        multiple: false
+      })
+
+      QueryManager.create(:test_schema, link_model, %{
+        id: "struct_group_link",
+        label: "Struct Group Link",
+        arke_or_group_id: "struct_group",
+        connection_type: "struct_conn",
+        direction: "child",
+        multiple: false
+      })
+
+      LinkManager.add_node(
+        :test_schema,
+        ArkeManager.get(:struct_source, :test_schema),
+        ParameterManager.get(:struct_link, :test_schema),
+        "parameter",
+        %{}
+      )
+
+      target_model = ArkeManager.get(:struct_target, :test_schema)
+
+      {:ok, target} =
+        QueryManager.create(:test_schema, target_model, %{id: "target_1", label: "Target 1"})
+
+      {:ok, source} =
+        QueryManager.create(:test_schema, ArkeManager.get(:struct_source, :test_schema), %{
+          id: "source_1",
+          label: "Source 1",
+          struct_link: "target_1"
+        })
+
+      {:ok, source: source, target: target}
+    end
+
+    test "encode leaves a link as its id by default", %{source: source} do
+      assert StructManager.encode(source, type: :json).struct_link == "target_1"
+    end
+
+    test "encode with load_links inlines the linked unit", %{source: source} do
+      encoded = StructManager.encode(source, type: :json, load_links: true)
+
+      assert encoded.struct_link.id == "target_1"
+      assert encoded.struct_link.arke_id == "struct_target"
+    end
+
+    test "encode with load_links on a list of units", %{source: source} do
+      [encoded] = StructManager.encode([source], type: :json, load_links: true)
+
+      assert encoded.struct_link.id == "target_1"
+    end
+
+    test "encode with load_links and nothing linked", %{target: target} do
+      assert StructManager.encode(target, type: :json, load_links: true).id == "target_1"
+    end
+
+    test "get_struct resolves link_ref through the ArkeManager" do
+      arke = ArkeManager.get(:struct_source, :test_schema)
+      struct = StructManager.get_struct(arke)
+
+      parameter = Enum.find(struct.parameters, fn p -> p.id == "struct_link" end)
+
+      assert parameter.type == "link"
+      assert parameter.link_ref.id == "struct_target"
+      assert is_list(parameter.link_ref.parameters)
+    end
+
+    test "get_struct falls back to the GroupManager for link_ref" do
+      arke = ArkeManager.get(:struct_source, :test_schema)
+
+      LinkManager.add_node(
+        :test_schema,
+        arke,
+        ParameterManager.get(:struct_group_link, :test_schema),
+        "parameter",
+        %{}
+      )
+
+      struct = StructManager.get_struct(ArkeManager.get(:struct_source, :test_schema))
+      parameter = Enum.find(struct.parameters, fn p -> p.id == "struct_group_link" end)
+
+      assert parameter.link_ref.id == "struct_group"
+      assert parameter.link_ref.arke_id == "group"
+    end
+
+    test "get_struct leaves link_ref nil when the target does not exist" do
+      link_model = ArkeManager.get(:link, :arke_system)
+
+      QueryManager.create(:test_schema, link_model, %{
+        id: "struct_dangling_link",
+        label: "Dangling",
+        arke_or_group_id: "not_a_thing"
+      })
+
+      arke = ArkeManager.get(:struct_source, :test_schema)
+
+      LinkManager.add_node(
+        :test_schema,
+        arke,
+        ParameterManager.get(:struct_dangling_link, :test_schema),
+        "parameter",
+        %{}
+      )
+
+      struct = StructManager.get_struct(ArkeManager.get(:struct_source, :test_schema))
+      parameter = Enum.find(struct.parameters, fn p -> p.id == "struct_dangling_link" end)
+
+      assert parameter.link_ref == nil
+    end
+  end
+
+  describe "StructManager.get_struct/3 add_value" do
+    setup do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+
+      QueryManager.create(:test_schema, arke_model, %{id: "struct_base", label: "Struct Base"})
+
+      for parameter_id <- [:id, :arke_id, :metadata, :inserted_at, :updated_at, :label] do
+        LinkManager.add_node(
+          :test_schema,
+          ArkeManager.get(:struct_base, :test_schema),
+          ParameterManager.get(parameter_id, :arke_system),
+          "parameter",
+          %{}
+        )
+      end
+
+      arke = ArkeManager.get(:struct_base, :test_schema)
+
+      unit =
+        Unit.load(arke, %{
+          id: "base_unit",
+          label: "Base Unit",
+          inserted_at: ~U[2024-01-02 03:04:05Z],
+          updated_at: ~U[2024-01-03 03:04:05Z],
+          metadata: %{project: :test_schema, tag: "x"}
+        })
+
+      {:ok, arke: arke, unit: unit}
+    end
+
+    test "reads the value of every base parameter off the unit", %{arke: arke, unit: unit} do
+      values =
+        StructManager.get_struct(arke, unit, [])
+        |> Map.fetch!(:parameters)
+        |> Map.new(fn p -> {p.id, p.value} end)
+
+      assert values["id"] == :base_unit
+      assert values["arke_id"] == :struct_base
+      assert values["metadata"] == %{tag: "x"}
+      assert values["inserted_at"] == ~U[2024-01-02 03:04:05Z]
+      assert values["updated_at"] == ~U[2024-01-03 03:04:05Z]
+      assert values["label"] == "Base Unit"
+    end
+
+    test "include and exclude filter the parameters", %{arke: arke, unit: unit} do
+      included =
+        StructManager.get_struct(arke, unit, %{"include" => ["label"]})
+        |> Map.fetch!(:parameters)
+        |> Enum.map(& &1.id)
+
+      assert included == ["label"]
+
+      excluded =
+        StructManager.get_struct(arke, unit, %{"exclude" => ["label"]})
+        |> Map.fetch!(:parameters)
+        |> Enum.map(& &1.id)
+
+      refute "label" in excluded
+      assert "id" in excluded
+    end
   end
 end

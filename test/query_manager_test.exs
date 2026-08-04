@@ -387,6 +387,147 @@ defmodule Arke.QueryManagerTest do
     end
   end
 
+  # A parameter of type link keeps an arke_link row in step with its value:
+  # created on create, swapped on update, dropped when the value goes away.
+  describe "link parameters" do
+    setup do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      link_model = ArkeManager.get(:link, :arke_system)
+
+      for id <- ["qm_source", "qm_target"] do
+        QueryManager.create(:test_schema, arke_model, %{id: id, label: id})
+      end
+
+      for {id, opts} <- [
+            {"qm_link", %{direction: "child", multiple: false}},
+            {"qm_link_multi", %{direction: "child", multiple: true}},
+            {"qm_link_parent", %{direction: "parent", multiple: false}}
+          ] do
+        QueryManager.create(
+          :test_schema,
+          link_model,
+          Map.merge(opts, %{
+            id: id,
+            label: id,
+            arke_or_group_id: "qm_target",
+            connection_type: "qm_conn"
+          })
+        )
+      end
+
+      for target <- ["qm_a", "qm_b", "qm_c"] do
+        QueryManager.create(:test_schema, ArkeManager.get(:qm_target, :test_schema), %{
+          id: target,
+          label: target
+        })
+      end
+
+      :ok
+    end
+
+    defp link_parameter(parameter_id) do
+      LinkManager.add_node(
+        :test_schema,
+        ArkeManager.get(:qm_source, :test_schema),
+        ParameterManager.get(parameter_id, :test_schema),
+        "parameter",
+        %{}
+      )
+
+      ArkeManager.get(:qm_source, :test_schema)
+    end
+
+    # ETS selects come back in no particular order, so sort before asserting
+    defp connections do
+      QueryManager.filter_by(project: :test_schema, arke_id: "arke_link")
+      |> Enum.filter(fn link -> link.data.type == "qm_conn" end)
+      |> Enum.map(fn link ->
+        {link.data.parent_id, link.data.child_id, Map.delete(link.metadata, :project)}
+      end)
+      |> Enum.sort()
+    end
+
+    test "create links the unit to the value" do
+      arke = link_parameter(:qm_link)
+
+      {:ok, _unit} =
+        QueryManager.create(:test_schema, arke, %{id: "qm_unit", label: "U", qm_link: "qm_a"})
+
+      assert connections() == [{"qm_unit", "qm_a", %{parameter_id: "qm_link"}}]
+    end
+
+    test "create with no value links nothing" do
+      arke = link_parameter(:qm_link)
+
+      {:ok, _unit} = QueryManager.create(:test_schema, arke, %{id: "qm_unit", label: "U"})
+
+      assert connections() == []
+    end
+
+    test "update swaps the link" do
+      arke = link_parameter(:qm_link)
+
+      {:ok, unit} =
+        QueryManager.create(:test_schema, arke, %{id: "qm_unit", label: "U", qm_link: "qm_a"})
+
+      {:ok, _updated} = QueryManager.update(unit, qm_link: "qm_b")
+
+      assert connections() == [{"qm_unit", "qm_b", %{parameter_id: "qm_link"}}]
+    end
+
+    test "update to nil drops the link" do
+      arke = link_parameter(:qm_link)
+
+      {:ok, unit} =
+        QueryManager.create(:test_schema, arke, %{id: "qm_unit", label: "U", qm_link: "qm_a"})
+
+      {:ok, _updated} = QueryManager.update(unit, qm_link: nil)
+
+      assert connections() == []
+    end
+
+    test "update to the same value leaves the link alone" do
+      arke = link_parameter(:qm_link)
+
+      {:ok, unit} =
+        QueryManager.create(:test_schema, arke, %{id: "qm_unit", label: "U", qm_link: "qm_a"})
+
+      {:ok, _updated} = QueryManager.update(unit, qm_link: "qm_a")
+
+      assert connections() == [{"qm_unit", "qm_a", %{parameter_id: "qm_link"}}]
+    end
+
+    test "a multiple parameter adds and removes one link per value" do
+      arke = link_parameter(:qm_link_multi)
+
+      {:ok, unit} =
+        QueryManager.create(:test_schema, arke, %{
+          id: "qm_unit",
+          label: "U",
+          qm_link_multi: ["qm_a", "qm_b"]
+        })
+
+      assert Enum.map(connections(), fn {_p, child, _m} -> child end) == ["qm_a", "qm_b"]
+
+      {:ok, _updated} = QueryManager.update(unit, qm_link_multi: ["qm_b", "qm_c"])
+
+      assert Enum.map(connections(), fn {_p, child, _m} -> child end) == ["qm_b", "qm_c"]
+    end
+
+    test "a parent direction links the value to the unit" do
+      arke = link_parameter(:qm_link_parent)
+
+      {:ok, _unit} =
+        QueryManager.create(:test_schema, arke, %{
+          id: "qm_unit",
+          label: "U",
+          qm_link_parent: "qm_a"
+        })
+
+      assert connections() == [{"qm_a", "qm_unit", %{parameter_id: "qm_link_parent"}}]
+    end
+  end
+
   describe "create without an id" do
     @uuid_v1 ~r/^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
