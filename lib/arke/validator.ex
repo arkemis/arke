@@ -258,7 +258,100 @@ defmodule Arke.Validator do
   defp check_by_type(errors, %{arke_id: :string} = parameter, _value),
     do: errors ++ [{parameter.data.label, "must be a string"}]
 
+  ######################################################################
+  # NUMBER PARAMETER ###################################################
+  ######################################################################
+
+  defp check_by_type(errors, %{arke_id: :integer} = parameter, value)
+       when is_integer(value) or is_list(value) do
+    errors
+    |> check_max(parameter, value)
+    |> check_min(parameter, value)
+    |> check_values(parameter, value)
+    |> check_multiple(parameter, value)
+  end
+
+  defp check_by_type(errors, %{arke_id: :integer, data: %{label: label}} = _parameter, _value),
+    do: errors ++ [{label, "must be an integer"}]
+
+  defp check_by_type(errors, %{arke_id: :float} = parameter, value)
+       when is_number(value) or is_list(value) do
+    errors
+    |> check_max(parameter, value)
+    |> check_min(parameter, value)
+    |> check_values(parameter, value)
+    |> check_multiple(parameter, value)
+  end
+
+  defp check_by_type(errors, %{arke_id: :float, data: %{label: label}} = _parameter, _value),
+    do: errors ++ [{label, "must be a float"}]
+
+  defp check_by_type(_errors, %{arke_id: :dict} = _parameter, value) when is_map(value), do: []
+
+  defp check_by_type(errors, %{arke_id: :dict, data: %{label: label}} = _parameter, _value),
+    do: errors ++ [{label, "must be a map"}]
+
+  defp check_by_type(_errors, %{arke_id: :list} = _parameter, value) when is_list(value), do: []
+
+  defp check_by_type(errors, %{arke_id: :list, data: %{label: label}} = _parameter, _value),
+    do: errors ++ [{label, "must be a list"}]
+
+  defp check_by_type(errors, %{arke_id: :date} = parameter, value) do
+    case DatetimeHandler.parse_date(value) do
+      {:ok, _date} -> errors
+      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+    end
+  end
+
+  # TIME
+
+  defp check_by_type(errors, %{arke_id: :time} = parameter, value) do
+    case DatetimeHandler.parse_time(value) do
+      {:ok, _date} -> errors
+      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+    end
+  end
+
+  # DATETIME
+
+  defp check_by_type(errors, %{arke_id: :datetime} = parameter, value) do
+    case DatetimeHandler.parse_datetime(value) do
+      {:ok, _date} -> errors
+      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+    end
+  end
+
+  ######################################################################
+  # BOOLEAN PARAMETER ##################################################
+  ######################################################################
+
+  defp check_by_type(errors, %{arke_id: :boolean} = _parameter, value)
+       when is_boolean(value),
+       do: errors
+
+  defp check_by_type(errors, %{arke_id: :boolean} = parameter, _value),
+    do: errors ++ [{parameter.data.label, "must be a boolean"}]
+
+  ######################################################################
+  # ARKE LINK PARAMETER ################################################
+  ######################################################################
+
+  # defp check_by_type(errors, %{arke_id: :arke_link} = parameter, value, project) when is_nil(value),
+  #   do: check_by_type(errors, parameter, [], project)
+
+  # defp check_by_type(errors, %{arke_id: :arke_link} = parameter, value, project) when is_list(value)
+  #   units = QueryManager.filter_by(project: project, id__in: value)
+
+  #   with nil <- QueryManager.filter_by(project: project, id__in: value),
+  #   do: errors,
+  #   else: (_ -> errors ++ [{"duplicate values are not allowed for", id}])
+
+  # end
+
+  defp check_by_type(errors, _, _), do: errors
+
   # --- start Enum ---
+
   defp check_values(errors, %{data: %{values: nil}} = _parameter, _value), do: errors
 
   defp check_values(
@@ -405,40 +498,6 @@ defmodule Arke.Validator do
   # NUMBER PARAMETER ###################################################
   ######################################################################
 
-  defp check_by_type(errors, %{arke_id: :integer} = parameter, value)
-       when is_integer(value) or is_list(value) do
-    errors
-    |> check_max(parameter, value)
-    |> check_min(parameter, value)
-    |> check_values(parameter, value)
-    |> check_multiple(parameter, value)
-  end
-
-  defp check_by_type(errors, %{arke_id: :integer, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be an integer"}]
-
-  defp check_by_type(errors, %{arke_id: :float} = parameter, value)
-       when is_number(value) or is_list(value) do
-    errors
-    |> check_max(parameter, value)
-    |> check_min(parameter, value)
-    |> check_values(parameter, value)
-    |> check_multiple(parameter, value)
-  end
-
-  defp check_by_type(errors, %{arke_id: :float, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a float"}]
-
-  defp check_by_type(_errors, %{arke_id: :dict} = _parameter, value) when is_map(value), do: []
-
-  defp check_by_type(errors, %{arke_id: :dict, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a map"}]
-
-  defp check_by_type(_errors, %{arke_id: :list} = _parameter, value) when is_list(value), do: []
-
-  defp check_by_type(errors, %{arke_id: :list, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a list"}]
-
   defp check_max(errors, %{data: %{max: max}} = _parameter, _) when is_nil(max), do: errors
 
   defp check_max(errors, %{data: %{max: max, label: label}} = parameter, value) do
@@ -464,58 +523,6 @@ defmodule Arke.Validator do
   end
 
   # DATE
-  defp check_by_type(errors, %{arke_id: :date} = parameter, value) do
-    case DatetimeHandler.parse_date(value) do
-      {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
-    end
-  end
-
-  # TIME
-  defp check_by_type(errors, %{arke_id: :time} = parameter, value) do
-    case DatetimeHandler.parse_time(value) do
-      {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
-    end
-  end
-
-  # DATETIME
-  defp check_by_type(errors, %{arke_id: :datetime} = parameter, value) do
-    case DatetimeHandler.parse_datetime(value) do
-      {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
-    end
-  end
-
-  ######################################################################
-  # BOOLEAN PARAMETER ##################################################
-  ######################################################################
-
-  defp check_by_type(errors, %{arke_id: :boolean} = _parameter, value)
-       when is_boolean(value),
-       do: errors
-
-  defp check_by_type(errors, %{arke_id: :boolean} = parameter, _value),
-    do: errors ++ [{parameter.data.label, "must be a boolean"}]
-
-  ######################################################################
-  # ARKE LINK PARAMETER ################################################
-  ######################################################################
-
-  # defp check_by_type(errors, %{arke_id: :arke_link} = parameter, value, project) when is_nil(value),
-  #   do: check_by_type(errors, parameter, [], project)
-
-  # defp check_by_type(errors, %{arke_id: :arke_link} = parameter, value, project) when is_list(value)
-  #   units = QueryManager.filter_by(project: project, id__in: value)
-
-  #   with nil <- QueryManager.filter_by(project: project, id__in: value),
-  #   do: errors,
-  #   else: (_ -> errors ++ [{"duplicate values are not allowed for", id}])
-
-  # end
-
-  defp check_by_type(errors, _, _), do: errors
-
   defp __enum_error_common__(errors, %{id: _id, data: %{values: nil}} = _parameter), do: errors
   defp __enum_error_common__(errors, %{id: _id, data: %{values: %{}}} = _parameter), do: errors
   defp __enum_error_common__(errors, %{id: _id, data: %{values: []}} = _parameter), do: errors
