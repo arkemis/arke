@@ -139,37 +139,10 @@ defmodule Arke.Core.Unit do
   def get_default_value(value, parameter) when is_nil(value), do: handle_default_value(parameter)
   def get_default_value(value, parameter), do: value
 
-  defp handle_default_value(%{arke_id: :string, data: %{default_string: default_string}} = _),
-    do: default_string
-
-  defp handle_default_value(%{arke_id: :integer, data: %{default_integer: default_integer}} = _),
-    do: default_integer
-
-  defp handle_default_value(%{arke_id: :float, data: %{default_float: default_float}} = _),
-    do: default_float
-
-  defp handle_default_value(%{arke_id: :boolean, data: %{default_boolean: default_boolean}} = _),
-    do: default_boolean
-
-  defp handle_default_value(%{arke_id: :date, data: %{default_date: default_date}} = _),
-    do: default_date
-
-  defp handle_default_value(%{arke_id: :time, data: %{default_time: default_time}} = _),
-    do: default_time
-
-  defp handle_default_value(
-         %{arke_id: :datetime, data: %{default_datetime: default_datetime}} = _
-       ),
-       do: default_datetime
-
-  defp handle_default_value(%{arke_id: :dict, data: %{default_dict: default_dict}} = _),
-    do: default_dict
-
-  defp handle_default_value(%{arke_id: :list, data: %{default_list: default_list}} = _),
-    do: default_list
-
-  defp handle_default_value(%{arke_id: :link, data: %{default_link: default_link}} = _),
-    do: default_link
+  # Any parameter type is supported: its default lives in `data[:"default_#{arke_id}"]`
+  defp handle_default_value(%{arke_id: arke_id, data: data})
+       when is_atom(arke_id) and is_map(data),
+       do: Map.get(data, :"default_#{arke_id}")
 
   defp handle_default_value(_), do: nil
 
