@@ -217,4 +217,30 @@ defmodule Arke.Core.UnitTest do
       assert Keyword.fetch!(Unit.as_args(arke, unit), :id) == "existing_id"
     end
   end
+
+  describe "Unit.get_default_value/2" do
+    test "reads default_<arke_id> for every parameter type" do
+      for type <- ~w[string integer float boolean date time datetime dict list link]a do
+        parameter = %{arke_id: type, data: %{:"default_#{type}" => {:default, type}}}
+        assert Unit.get_default_value(nil, parameter) == {:default, type}
+      end
+    end
+
+    test "supports a parameter type nobody wrote a clause for" do
+      parameter = %{arke_id: :brand_new_type, data: %{default_brand_new_type: "works"}}
+      assert Unit.get_default_value(nil, parameter) == "works"
+    end
+
+    test "returns nil when the parameter has no matching default key" do
+      assert Unit.get_default_value(nil, %{arke_id: :string, data: %{default_integer: 1}}) == nil
+      assert Unit.get_default_value(nil, %{arke_id: :string, data: %{}}) == nil
+      assert Unit.get_default_value(nil, %{}) == nil
+    end
+
+    test "keeps a given value over the default" do
+      parameter = %{arke_id: :string, data: %{default_string: "fallback"}}
+      assert Unit.get_default_value("given", parameter) == "given"
+      assert Unit.get_default_value(false, parameter) == false
+    end
+  end
 end
