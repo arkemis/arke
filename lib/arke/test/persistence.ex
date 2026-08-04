@@ -126,7 +126,7 @@ defmodule Arke.Test.Persistence do
 
   defp key(project, %Unit{id: id}), do: {project, id}
 
-  defp put_id(%Unit{id: nil} = unit), do: %{unit | id: UUID.uuid1()}
+  defp put_id(%Unit{id: nil} = unit), do: %{unit | id: Unit.generate_id()}
   defp put_id(unit), do: unit
 
   defp put_project(%Unit{metadata: metadata} = unit, project),

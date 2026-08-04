@@ -184,4 +184,37 @@ defmodule Arke.Core.UnitTest do
       assert DateTime.compare(stamped, before) in [:eq, :gt]
     end
   end
+
+  describe "Unit.as_args/2 generated id" do
+    @uuid_v1 ~r/^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+    test "generates a lowercase, dash-separated v1 uuid when the unit has no id" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, label: "no id")
+
+      assert is_nil(unit.id)
+
+      id = Keyword.fetch!(Unit.as_args(arke, unit), :id)
+
+      assert is_binary(id)
+      assert String.length(id) == 36
+      assert id =~ @uuid_v1
+    end
+
+    test "generates a distinct id on every call" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, label: "no id")
+
+      ids = for _ <- 1..20, do: Keyword.fetch!(Unit.as_args(arke, unit), :id)
+
+      assert length(Enum.uniq(ids)) == 20
+    end
+
+    test "keeps an id the unit already has" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, id: :existing_id, label: "has id")
+
+      assert Keyword.fetch!(Unit.as_args(arke, unit), :id) == "existing_id"
+    end
+  end
 end
