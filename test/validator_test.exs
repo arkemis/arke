@@ -137,6 +137,26 @@ defmodule Arke.ValidatorTest do
                {"not_valid", [{"Default", "must be a map"}]}
     end
 
+    test "list" do
+      arke_list = ArkeManager.get(:list, :arke_system)
+      parameter = ParameterManager.get(:default_list, :arke_system)
+
+      assert Arke.Validator.validate_parameter(
+               arke_list,
+               parameter,
+               ["one", "two"],
+               :test_schema
+             ) == {["one", "two"], []}
+    end
+
+    test "list (error)" do
+      arke_list = ArkeManager.get(:list, :arke_system)
+      parameter = ParameterManager.get(:default_list, :arke_system)
+
+      assert Arke.Validator.validate_parameter(arke_list, parameter, "not_valid", :test_schema) ==
+               {"not_valid", [{"Default", "must be a list"}]}
+    end
+
     test "enum" do
       ## STRING
       arke_string = ArkeManager.get(:string, :arke_system)
