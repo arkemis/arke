@@ -91,17 +91,21 @@ defmodule Arke.Core.Unit do
         with {:ok, opts} <- ArkeManager.call_func(arke, :before_load, [opts, persistence_fn]) do
           data = load_data(arke, %{}, opts)
 
-          new(
-            id,
-            data,
-            arke.id,
-            link,
-            metadata,
-            inserted_at,
-            updated_at,
-            __module__,
-            runtime_data
-          )
+          unit =
+            new(
+              id,
+              data,
+              arke.id,
+              link,
+              metadata,
+              inserted_at,
+              updated_at,
+              __module__,
+              runtime_data
+            )
+
+          {:ok, loaded_unit} = ArkeManager.call_func(arke, :on_load, [unit, persistence_fn])
+          loaded_unit
         end
     end
   end
@@ -169,8 +173,10 @@ defmodule Arke.Core.Unit do
 
   defp handle_default_value(_), do: nil
 
-  defp get_link(%{depth: depth, link_metadata: link_metadata,starting_unit: starting_unit} = args),
-    do: {%{depth: depth, metadata: link_metadata,starting_unit: starting_unit}, args}
+  defp get_link(
+         %{depth: depth, link_metadata: link_metadata, starting_unit: starting_unit} = args
+       ),
+       do: {%{depth: depth, metadata: link_metadata, starting_unit: starting_unit}, args}
 
   defp get_link(args), do: {nil, args}
 
@@ -227,6 +233,9 @@ defmodule Arke.Core.Unit do
     Map.merge(unit.data, parsed_data, fn _k, udata, pdata -> pdata end)
   end
 
+  @spec generate_id() :: String.t()
+  def generate_id, do: Uniq.UUID.uuid1()
+
   def as_args(arke, unit) do
     [
       id: handle_id(unit.id),
@@ -238,7 +247,7 @@ defmodule Arke.Core.Unit do
     ]
   end
 
-  defp handle_id(id) when is_nil(id), do: UUID.uuid1()
+  defp handle_id(id) when is_nil(id), do: generate_id()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
   defp handle_id(id) when is_binary(id), do: id
   # TODO handle error
@@ -262,8 +271,7 @@ defmodule Arke.Core.Unit do
 
   defp update_encoded_unit_data(_, data, _), do: data
 
-
-  defp handle_id(id) when is_nil(id), do: UUID.uuid1()
+  defp handle_id(id) when is_nil(id), do: generate_id()
   defp handle_id(id) when is_atom(id), do: Atom.to_string(id)
   defp handle_id(id) when is_binary(id), do: id
   # TODO handle error
@@ -279,11 +287,11 @@ defmodule Arke.Core.Unit do
   defp update_encoded_unit_data(%{data: %{only_runtime: true}}, data, _), do: data
 
   defp update_encoded_unit_data(%{id: id}, data, value),
-       do:
-         Map.put_new(data, Atom.to_string(id), %{
-           :value => value,
-           :datetime => Arke.DatetimeHandler.now(:datetime)
-         })
+    do:
+      Map.put_new(data, Atom.to_string(id), %{
+        :value => value,
+        :datetime => Arke.DatetimeHandler.now(:datetime)
+      })
 
   defp update_encoded_unit_data(_, data, _), do: data
 
@@ -362,7 +370,6 @@ defmodule Arke.Core.Unit do
 
   defp parse_value(value, %{arke_id: :atom}) when is_binary(value),
     do: String.to_existing_atom(value)
-
 
   defp parse_value(value, %{arke_id: :date}) do
     with {:ok, date} <- DatetimeHandler.parse_date(value),

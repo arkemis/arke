@@ -13,10 +13,8 @@
 # limitations under the License.
 
 defmodule Arke.Utils.FileStorage do
-
-  defmacro __using__(_)do
+  defmacro __using__(_) do
     quote do
-
       def upload_file(file_name, file_data, opts \\ []), do: {:ok, nil}
 
       def get_file(file_path, opts \\ []), do: nil
@@ -34,5 +32,4 @@ defmodule Arke.Utils.FileStorage do
                      get_bucket_file_signed_url: 2
     end
   end
-
 end

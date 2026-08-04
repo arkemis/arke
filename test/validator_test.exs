@@ -1,5 +1,5 @@
 defmodule Arke.ValidatorTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   describe "Validator.validate/2" do
     test "update :ok" do
@@ -426,7 +426,7 @@ defmodule Arke.ValidatorTest do
                {"01/01/2020",
                 [
                   {"Default",
-                   "must be %DateTime | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"}
+                   "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"}
                 ]}
     end
 
@@ -472,18 +472,20 @@ defmodule Arke.ValidatorTest do
                {datetime, []}
     end
 
-    # TODO: fix
     test "unique" do
-      arke_user = ArkeManager.get(:user, :arke_system)
-      opts = %{label: "Nome", username: "unique_username", type: "customer", password: "test"}
-      QueryManager.create(:arke_system, arke_user, opts)
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+
+      QueryManager.create(:test_schema, arke, %{
+        string_support: "unique_username",
+        enum_integer_support: [1]
+      })
 
       assert Arke.Validator.validate_parameter(
-               arke_user,
-               :username,
+               arke,
+               :string_support,
                "unique_username",
-               :arke_system
-             ) == {"unique_username", [{"duplicate values are not allowed for", :username}]}
+               :test_schema
+             ) == {"unique_username", [{"duplicate values are not allowed for", :string_support}]}
     end
   end
 
@@ -504,21 +506,13 @@ defmodule Arke.ValidatorTest do
       ]
 
       arke_string = ArkeManager.get(:string, :arke_system)
-
-      string_unit =
-        Unit.load(arke_string, opts, :create) |> Map.put(:metadata, %{project: :test_schema})
-
-      ArkeManager.call_func(arke_string, :on_create, [arke_string, string_unit])
+      QueryManager.create(:test_schema, arke_string, opts)
       parameter_string = ParameterManager.get(:string_test_default, :test_schema)
 
       # Create Arke
       arke_model = ArkeManager.get(:arke, :arke_system)
       arke_data = [id: :test_arke_default, label: "Test Arke Default"]
-
-      arke_unit =
-        Unit.load(arke_model, arke_data, :create) |> Map.put(:metadata, %{project: :test_schema})
-
-      ArkeManager.call_func(arke_model, :on_create, [arke_model, arke_unit])
+      QueryManager.create(:test_schema, arke_model, arke_data)
 
       # Create association
       arke_link = ArkeManager.get(:arke_link, :arke_system)
@@ -538,14 +532,7 @@ defmodule Arke.ValidatorTest do
         metadata: defaults
       ]
 
-      link_unit = Unit.load(arke_link, link_data, :create)
-
-      new_meta =
-        Map.get(link_unit, :metadata)
-        |> Map.put_new(:project, :test_schema)
-
-      link_unit = Map.replace(link_unit, :metadata, new_meta)
-      ArkeManager.call_func(arke_link, :on_create, [arke_link, link_unit])
+      QueryManager.create(:test_schema, arke_link, link_data)
 
       # Get arke and the parameter just linked
       arke = ArkeManager.get(:test_arke_default, :test_schema)
@@ -586,22 +573,13 @@ defmodule Arke.ValidatorTest do
       ]
 
       arke_integer = ArkeManager.get(:integer, :arke_system)
-
-      integer_unit =
-        Unit.load(arke_integer, opts, :create) |> Map.put(:metadata, %{project: :test_schema})
-
-      {:ok, _unit} = ArkeManager.call_func(arke_integer, :on_create, [arke_integer, integer_unit])
-
+      QueryManager.create(:test_schema, arke_integer, opts)
       parameter_integer = ParameterManager.get(:integer, :test_schema)
 
       # Create Arke
       arke_model = ArkeManager.get(:arke, :arke_system)
       arke_data = [id: :test_arke_default, label: "Test Arke Default"]
-
-      arke_unit =
-        Unit.load(arke_model, arke_data, :create) |> Map.put(:metadata, %{project: :test_schema})
-
-      {:ok, _unit} = ArkeManager.call_func(arke_model, :on_create, [arke_model, arke_unit])
+      QueryManager.create(:test_schema, arke_model, arke_data)
 
       # Create association
       arke_link = ArkeManager.get(:arke_link, :arke_system)
@@ -621,14 +599,7 @@ defmodule Arke.ValidatorTest do
         metadata: defaults
       ]
 
-      link_unit = Unit.load(arke_link, link_data, :create)
-
-      new_meta =
-        Map.get(link_unit, :metadata)
-        |> Map.put_new(:project, :test_schema)
-
-      link_unit = Map.replace(link_unit, :metadata, new_meta)
-      ArkeManager.call_func(arke_link, :on_create, [arke_link, link_unit])
+      QueryManager.create(:test_schema, arke_link, link_data)
 
       # Get arke and the parameter just linked
       arke = ArkeManager.get(:test_arke_default, :test_schema)
@@ -664,19 +635,13 @@ defmodule Arke.ValidatorTest do
       ]
 
       arke_float = ArkeManager.get(:float, :arke_system)
-
-      float_unit = Unit.load(arke_float, opts) |> Map.put(:metadata, %{project: :test_schema})
-
-      ArkeManager.call_func(arke_float, :on_create, [arke_float, float_unit])
+      QueryManager.create(:test_schema, arke_float, opts)
       parameter_float = ParameterManager.get(:float, :test_schema)
 
       # Create Arke
       arke_model = ArkeManager.get(:arke, :arke_system)
       arke_data = [id: :test_arke_default, label: "Test Arke Default"]
-
-      arke_unit = Unit.load(arke_model, arke_data) |> Map.put(:metadata, %{project: :test_schema})
-
-      ArkeManager.call_func(arke_model, :on_create, [arke_model, arke_unit])
+      QueryManager.create(:test_schema, arke_model, arke_data)
 
       # Create association
       arke_link = ArkeManager.get(:arke_link, :arke_system)
@@ -700,14 +665,7 @@ defmodule Arke.ValidatorTest do
         metadata: defaults
       ]
 
-      link_unit = Unit.load(arke_link, link_data, :create)
-
-      new_meta =
-        Map.get(link_unit, :metadata)
-        |> Map.put_new(:project, :test_schema)
-
-      link_unit = Map.replace(link_unit, :metadata, new_meta)
-      ArkeManager.call_func(arke_link, :on_create, [arke_link, link_unit])
+      QueryManager.create(:test_schema, arke_link, link_data)
 
       # Get arke and the parameter just linked
       arke = ArkeManager.get(:test_arke_default, :test_schema)

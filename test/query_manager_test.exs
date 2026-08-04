@@ -1,5 +1,5 @@
 defmodule Arke.QueryManagerTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   test "CRUD functions" do
     arke_model = ArkeManager.get(:arke, :arke_system)
@@ -8,33 +8,42 @@ defmodule Arke.QueryManagerTest do
     not_found = ArkeManager.get(:query_create, :test_schema)
 
     {:ok, unit} =
-      QueryManager.create(:test_schema, arke_model, id: :query_create, label: "Query arke created")
+      QueryManager.create(:test_schema, arke_model,
+        id: :query_create,
+        label: "Query arke created"
+      )
 
     created_manager = ArkeManager.get(:query_create, :test_schema)
 
     assert created_manager.id == :query_create
     assert unit.id == :query_create
 
-    assert not_found ==
-             {:error,
-              [
-                %{
-                  context: "Elixir.Arke.Boundary.ArkeManager",
-                  message: "Unit with id 'query_create' not found"
-                }
-              ]}
+    assert not_found == nil
 
     # Delete
     QueryManager.delete(:test_schema, unit)
 
-    assert ArkeManager.get(:query_create, :test_schema) ==
-             {:error,
-              [
-                %{
-                  context: "Elixir.Arke.Boundary.ArkeManager",
-                  message: "Unit with id 'query_create' not found"
-                }
-              ]}
+    assert ArkeManager.get(:query_create, :test_schema) == nil
+  end
+
+  test "update stamps updated_at with a second-precision UTC datetime" do
+    arke_model = ArkeManager.get(:arke, :arke_system)
+
+    {:ok, unit} =
+      QueryManager.create(:test_schema, arke_model,
+        id: :query_updated_at,
+        label: "Query updated_at"
+      )
+
+    before = DateTime.utc_now() |> DateTime.truncate(:second)
+    {:ok, updated} = QueryManager.update(unit, label: "Query updated_at changed")
+
+    assert %DateTime{} = updated.updated_at
+    assert updated.updated_at.time_zone == "Etc/UTC"
+    assert updated.updated_at.microsecond == {0, 0}
+    assert DateTime.compare(updated.updated_at, before) in [:eq, :gt]
+
+    QueryManager.delete(:test_schema, updated)
   end
 
   defp load_unit(_context) do
@@ -44,6 +53,27 @@ defmodule Arke.QueryManagerTest do
 
   defp get_query(_context) do
     %{query: QueryManager.query(project: :test_schema, arke: :string)}
+  end
+
+  defp create_projects() do
+    arke_project = ArkeManager.get(:arke_project, :arke_system)
+
+    Enum.map(["query_project_a", "query_project_b"], fn id ->
+      {:ok, unit} =
+        QueryManager.create(:arke_system, arke_project, %{
+          id: id,
+          name: id,
+          description: id,
+          type: "postgres_schema",
+          label: id
+        })
+
+      unit
+    end)
+  end
+
+  defp project_query() do
+    QueryManager.query(project: :arke_system) |> QueryManager.where(arke_id__contains: "project")
   end
 
   describe "query" do
@@ -111,9 +141,13 @@ defmodule Arke.QueryManagerTest do
     end
 
     test "filter_by" do
-      # {:execute, :all} is the return of the persistence fn so it means it has been called correctly
-      assert QueryManager.filter_by(arke_id: :arke_project, project: :arke_system) ==
-               {:execute, :all}
+      create_projects()
+
+      assert QueryManager.filter_by(arke_id: :arke_project, project: :arke_system)
+             |> Enum.map(& &1.id)
+             |> Enum.sort() == [:query_project_a, :query_project_b]
+
+      assert QueryManager.filter_by(arke_id: :arke_project, project: :another_project) == []
     end
 
     test "and_", %{query: query} = _context do
@@ -303,52 +337,80 @@ defmodule Arke.QueryManagerTest do
     end
 
     test "pagination" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      create_projects()
 
-      assert QueryManager.pagination(query, 0, 10) == {{:execute, :count}, {:execute, :all}}
+      {count, units} = QueryManager.pagination(project_query(), 0, 10)
+
+      assert count == 2
+      assert Enum.map(units, & &1.id) |> Enum.sort() == [:query_project_a, :query_project_b]
+
+      {count, units} = QueryManager.pagination(project_query(), 1, 10)
+
+      assert count == 2
+      assert length(units) == 1
     end
 
     test "all" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      create_projects()
 
-      assert QueryManager.all(query) == {:execute, :all}
+      assert QueryManager.all(project_query()) |> Enum.map(& &1.id) |> Enum.sort() ==
+               [:query_project_a, :query_project_b]
     end
 
     test "one" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      assert QueryManager.one(project_query()) == nil
 
-      # nil is the return of the persistence fn which means it has been called correctly
-      assert QueryManager.one(query) == nil
+      create_projects()
+
+      assert QueryManager.one(project_query()).arke_id == :arke_project
     end
 
     test "raw" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      create_projects()
 
-      assert QueryManager.raw(query) == {:execute, :raw}
+      assert QueryManager.raw(project_query()) |> length() == 2
     end
 
     test "count" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      assert QueryManager.count(project_query()) == 0
 
-      assert QueryManager.count(query) == {:execute, :count}
+      create_projects()
+
+      assert QueryManager.count(project_query()) == 2
     end
 
     test "pseudo_query" do
-      query =
-        QueryManager.query(project: :arke_system)
-        |> QueryManager.where(arke_id__contains: "project")
+      query = project_query()
 
-      assert QueryManager.pseudo_query(query) == {:execute, :pseudo_query}
+      assert QueryManager.pseudo_query(query).project == :arke_system
+      assert QueryManager.pseudo_query(query).filters == query.filters
+    end
+  end
+
+  describe "create without an id" do
+    @uuid_v1 ~r/^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+    test "assigns a lowercase, dash-separated v1 uuid" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+
+      {:ok, unit} = QueryManager.create(:test_schema, arke_model, label: "no id given")
+
+      id = to_string(unit.id)
+
+      assert String.length(id) == 36
+      assert id =~ @uuid_v1
+    end
+
+    test "assigns a distinct id to each unit" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+
+      ids =
+        for _ <- 1..10 do
+          {:ok, unit} = QueryManager.create(:test_schema, arke_model, label: "no id given")
+          unit.id
+        end
+
+      assert length(Enum.uniq(ids)) == 10
     end
   end
 end

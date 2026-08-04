@@ -1,5 +1,5 @@
 defmodule Arke.Core.UnitTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   describe "Unit" do
     test "new" do
@@ -14,15 +14,13 @@ defmodule Arke.Core.UnitTest do
       unit_bin =
         Unit.new(:unit_test_id, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__)
 
-      #
-      unit_nil = Unit.new(12, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__)
-
       assert unit.id == :unit_test_id
       assert unit.arke_id == :arke
       assert unit_bin.id == :unit_test_id
       assert unit_bin.arke_id == :arke
-      assert unit_nil.id == nil
-      assert unit_nil.arke_id == :arke
+
+      assert Unit.new(12, [label: "Unit test id"], :arke, nil, %{}, now, now, __MODULE__) ==
+               {:error, [%{context: "parameter_validation", message: "id cannot be a number"}]}
     end
 
     test "load" do
@@ -125,6 +123,98 @@ defmodule Arke.Core.UnitTest do
       assert unit_updated.data.integer_support != unit_default.data.integer_support
       assert unit_updated.data.list_support != unit_default.data.list_support
       assert unit_updated.data.string_support != unit_default.data.string_support
+    end
+  end
+
+  describe "Unit.new/8 inserted_at and updated_at" do
+    @datetime_msg "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
+
+    defp build(inserted_at, updated_at \\ nil) do
+      Unit.new(:temporal_test, [label: "x"], :arke, nil, %{}, inserted_at, updated_at, __MODULE__)
+    end
+
+    test "keeps nil as nil" do
+      unit = build(nil, nil)
+      assert unit.inserted_at == nil
+      assert unit.updated_at == nil
+    end
+
+    test "passes a DateTime through unchanged" do
+      unit = build(~U[2024-03-05 10:20:30Z])
+      assert unit.inserted_at == ~U[2024-03-05 10:20:30Z]
+    end
+
+    test "promotes a NaiveDateTime to UTC" do
+      unit = build(~N[2024-03-05 10:20:30])
+      assert unit.inserted_at == ~U[2024-03-05 10:20:30Z]
+    end
+
+    test "accepts a zone-less iso8601 string as UTC" do
+      unit = build("2022-10-31T16:44:19")
+      assert unit.inserted_at == ~U[2022-10-31 16:44:19Z]
+    end
+
+    test "accepts a space-separated string with a zone" do
+      unit = build("2010-12-11 23:12:32Z")
+      assert unit.inserted_at == ~U[2010-12-11 23:12:32Z]
+    end
+
+    test "stores an error tuple when given a Date" do
+      unit = build(~D[2026-08-03])
+      assert unit.inserted_at == {:error, @datetime_msg}
+    end
+
+    test "stores an error tuple when given an unparseable string" do
+      unit = build("nope")
+      assert unit.inserted_at == {:error, @datetime_msg}
+    end
+  end
+
+  describe "Unit.encode_unit_data/2 timestamp" do
+    test "stamps each encoded parameter with a second-precision UTC datetime" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      before = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      encoded = Unit.encode_unit_data(arke, %{string_support: "a value"})
+
+      assert %{"string_support" => %{value: "a value", datetime: stamped}} = encoded
+      assert %DateTime{} = stamped
+      assert stamped.time_zone == "Etc/UTC"
+      assert stamped.microsecond == {0, 0}
+      assert DateTime.compare(stamped, before) in [:eq, :gt]
+    end
+  end
+
+  describe "Unit.as_args/2 generated id" do
+    @uuid_v1 ~r/^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+    test "generates a lowercase, dash-separated v1 uuid when the unit has no id" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, label: "no id")
+
+      assert is_nil(unit.id)
+
+      id = Keyword.fetch!(Unit.as_args(arke, unit), :id)
+
+      assert is_binary(id)
+      assert String.length(id) == 36
+      assert id =~ @uuid_v1
+    end
+
+    test "generates a distinct id on every call" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, label: "no id")
+
+      ids = for _ <- 1..20, do: Keyword.fetch!(Unit.as_args(arke, unit), :id)
+
+      assert length(Enum.uniq(ids)) == 20
+    end
+
+    test "keeps an id the unit already has" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke, id: :existing_id, label: "has id")
+
+      assert Keyword.fetch!(Unit.as_args(arke, unit), :id) == "existing_id"
     end
   end
 end

@@ -1,8 +1,8 @@
 defmodule Arke.MixProject do
   use Mix.Project
 
-  @version "0.4.3"
-  @scm_url "https://github.com/arkemishub/arke"
+  @version "0.7.0"
+  @scm_url "https://github.com/arkemis/arke"
   @site_url "https://arkehub.com"
 
   def project do
@@ -14,14 +14,13 @@ defmodule Arke.MixProject do
       config_path: "./config/config.exs",
       deps_path: "./deps",
       lockfile: "./mix.lock",
-      elixir: "~> 1.13",
+      elixir: "~> 1.16",
       source_url: @scm_url,
       homepage_url: @site_url,
       dialyzer: [plt_add_apps: ~w[eex]a],
       description: description(),
       package: package(),
       start_permanent: Mix.env() == :prod,
-      test_coverage: [tool: ExCoveralls],
       aliases: aliases(),
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -50,16 +49,12 @@ defmodule Arke.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:typed_struct, "~> 0.2.1"},
-      {:uuid, "~> 1.1"},
+      {:jason, "~> 1.0"},
+      {:uniq, "~> 0.6"},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.10", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
-      {:timex, "~> 3.7.11"},
-      {:google_api_storage, "~> 0.34.0"},
-      {:goth, "~> 1.3.0"},
-      {:httpoison, "~> 2.0"},
-      {:calendar, "~> 1.0.0"},
+      {:mimic, "~> 2.3", only: :test},
+      {:req, "~> 0.7"},
       {:xlsxir, "~> 1.6"},
       {:libcluster, "~> 3.3"}
     ]
@@ -87,7 +82,7 @@ defmodule Arke.MixProject do
     [
       # This option is only needed when you don't want to use the OTP application name
       name: "arke",
-      # These are the default files included in the package
+      files: ~w(lib mix.exs README* LICENSE* CHANGELOG* usage-rules.md usage-rules),
       licenses: ["Apache-2.0"],
       links: %{
         "Website" => @site_url,

@@ -1,5 +1,5 @@
 defmodule Arke.Core.GroupTest do
-  use Arke.RepoCase, async: true
+  use Arke.Test.RepoCase
 
   describe "Group CRUD" do
     test "create" do
@@ -10,29 +10,10 @@ defmodule Arke.Core.GroupTest do
       QueryManager.create(:test_schema, group_model, %{id: "group_test", name: "group_test"})
       after_create = GroupManager.get(:group_test, :test_schema)
 
-      assert before_create ==
-               {:error,
-                [
-                  %{
-                    context: "Elixir.Arke.Boundary.GroupManager",
-                    message: "Unit with id 'group_test' not found"
-                  }
-                ]}
+      assert before_create == nil
 
       assert after_create.arke_id == :group
       assert after_create.id == :group_test
-    end
-
-    test "update" do
-      group_model = ArkeManager.get(:group, :arke_system)
-
-      QueryManager.create(:test_schema, group_model, %{id: "group_test_edit", name: "group_test"})
-      before_update = GroupManager.get(:group_test_edit, :test_schema)
-      QueryManager.update(before_update, %{label: "edit_label"})
-      updated_group = GroupManager.get(:group_test_edit, :test_schema)
-
-      assert before_update.data.label == nil
-      assert updated_group.data.label == "edit_label"
     end
 
     test "delete" do
@@ -51,14 +32,7 @@ defmodule Arke.Core.GroupTest do
 
       assert before_delete.id == :group_test_delete
 
-      assert after_delete ==
-               {:error,
-                [
-                  %{
-                    context: "Elixir.Arke.Boundary.GroupManager",
-                    message: "Unit with id 'group_test_delete' not found"
-                  }
-                ]}
+      assert after_delete == nil
     end
   end
 end

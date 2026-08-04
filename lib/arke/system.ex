@@ -37,7 +37,7 @@ defmodule Arke.System do
         unit.data.parameters
       end
 
-      def on_load(data, _persistence_fn), do: {:ok, data}
+      def on_load(unit, _persistence_fn), do: {:ok, unit}
       def before_load(data, _persistence_fn), do: {:ok, data}
       def on_validate(arke, unit), do: {:ok, unit}
       def before_validate(arke, unit), do: {:ok, unit}
@@ -58,29 +58,30 @@ defmodule Arke.System do
             %{runtime_data: %{conn: %{method: "POST"} = conn}, metadata: %{project: project}} =
               arke
           ) do
-        member = ArkeAuth.Guardian.get_member(conn)
         mode = Map.get(conn.body_params, "mode", "default")
 
         case Map.get(conn.body_params, "file", nil) do
           nil -> {:error, "file is required", 400}
-          file -> import_units(arke, project, member, file, mode)
+          file -> import_units(arke, project, file, mode)
         end
       end
 
-      defp import_units(arke, project, member, file, mode) do
+      defp import_units(arke, project, file, mode) do
         {:ok, ref} = Enum.at(Xlsxir.multi_extract(file.path), 0)
         all_units = get_all_units_for_import(project)
 
         file_as_list = Xlsxir.get_list(ref)
 
-        header_file = Enum.at(file_as_list, 0)
+        file_header = Enum.at(file_as_list, 0)
         rows = file_as_list |> List.delete_at(0)
 
-        template_header = get_header_for_import(project, arke, header_file)
-        header = parse_header_for_import(template_header, header_file)
+        template_header = get_header_for_import(project, arke, file_header)
+        header = parse_header_for_import(template_header, file_header)
+        template_header_keys = MapSet.new(file_header)
+        file_header_keys = MapSet.new(file_header)
 
-        # used reverse to not add any breaking change
-        if Enum.reverse(header) == Enum.with_index(template_header) do
+        # used mapset in order to ignore all not used keys
+        if MapSet.subset?(template_header_keys, file_header_keys) do
           {correct_units, error_units} =
             Enum.with_index(rows)
             |> Enum.reduce({[], []}, fn {row, index}, {correct_units, error_units} ->
@@ -139,9 +140,14 @@ defmodule Arke.System do
         {existing_units, units_args, error_units} =
           before_unit_import(project, existing_units, units_args, error_units)
 
-        Enum.map(Stream.chunk_every(units_args, 5000) |> Enum.to_list(), fn chunk ->
-          ArkePostgres.Repo.insert_all("arke_unit", chunk, prefix: Atom.to_string(project))
-        end)
+        repo =
+          Application.get_env(:arke, :persistence)[:arke_postgres][:repo] ||
+            raise "no :repo configured under config :arke, :persistence"
+
+        Enum.each(
+          Enum.chunk_every(units_args, 5000),
+          &repo.insert_all("arke_unit", &1, prefix: Atom.to_string(project))
+        )
 
         on_unit_import(project, existing_units, units_args, error_units)
       end
@@ -176,9 +182,6 @@ defmodule Arke.System do
             else
               acc
             end
-
-          {_cell, _index}, acc ->
-            acc
         end)
       end
 
@@ -230,7 +233,7 @@ defmodule Arke.System do
 
                      # Import
                      import: 1,
-                     import_units: 5,
+                     import_units: 4,
                      get_header_for_import: 3,
                      get_all_units_for_import: 1,
                      load_units: 6,
@@ -544,11 +547,14 @@ defmodule Arke.System.BaseParameter do
   defp __check_map__(values), do: values
 
   defp __create_map_values__(values, opts, type, condition) do
+    keep = Keyword.get(opts, :keep_values_formatting, false)
     # FARE RAISE ECCEZIONE DA GESTIRE. CHIAVI DEVONO ESSERE TUTTE UGUALI
     with true <- Enum.all?(values, fn %{label: l, value: v} -> condition.(l, v) end) do
       new_values =
         Enum.map(values, fn k ->
-          %{label: String.capitalize(to_string(k.label)), value: __get_map_value__(k.value, type)}
+          label = to_string(k.label)
+          label = if keep, do: label, else: String.capitalize(label)
+          %{label: label, value: __get_map_value__(k.value, type)}
         end)
 
       __create_index__(opts, new_values)
@@ -561,10 +567,15 @@ defmodule Arke.System.BaseParameter do
   defp __get_map_value__(value, _), do: value
 
   defp __values_from_list__(values, opts, condition) do
+    keep = Keyword.get(opts, :keep_values_formatting, false)
     # FARE RAISE ECCEZIONE DA GESTIRE. CHIAVI DEVONO ESSERE TUTTE UGUALI
     with true <- Enum.all?(values, &condition.(&1)) do
       new_values =
-        Enum.map(values, fn k -> %{label: String.capitalize(to_string(k)), value: k} end)
+        Enum.map(values, fn k ->
+          label = to_string(k)
+          label = if keep, do: label, else: String.capitalize(label)
+          %{label: label, value: k}
+        end)
 
       __create_index__(opts, new_values)
     else

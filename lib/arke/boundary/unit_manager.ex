@@ -178,7 +178,6 @@ defmodule Arke.Boundary.UnitManager do
               GenServer.call(manager, {:add_link, unit, parameter_id, child_id, metadata})
 
             call_nodes_manager(manager, :add_link, [unit, parameter_id, child_id, metadata])
-
             current_node_update
         end
       end

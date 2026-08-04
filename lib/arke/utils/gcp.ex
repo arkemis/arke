@@ -13,94 +13,137 @@
 # limitations under the License.
 
 defmodule Arke.Utils.Gcp do
+  @moduledoc """
+  Google Cloud Storage backend for `Arke.Utils.FileStorage`.
+
+  Talks to the GCS JSON API over Req. The requests it builds are pinned by
+  `test/support/fixtures/gcs_requests.exs`.
+  """
   use Arke.Utils.FileStorage
+  require Logger
 
   alias Arke.Utils.ErrorGenerator, as: Error
-  @storage Application.get_env(:arke, :storage)
-  @service_account @storage[:gcp][:service_account]
-  @default_bucket @storage[:gcp][:default_bucket]
+  alias Arke.Utils.Gcp.Auth
+
+  @storage_base_url "https://storage.googleapis.com"
 
   def upload_file(file_name, file_data, opts \\ []) do
-    bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    optional_metadata = if opts[:public], do: [predefinedAcl: "publicread"], else: []
-    conn = get_connection()
-    {:ok, object} =
-      GoogleApi.Storage.V1.Api.Objects.storage_objects_insert_iodata(
-        conn,
-        bucket,
-        "multipart",
-        %{name: file_name},
-        file_data,
-        optional_metadata
-      )
-  end
+    params =
+      [uploadType: "multipart"] ++
+        if(opts[:public], do: [predefinedAcl: "publicread"], else: [])
 
+    body = [
+      metadata: {Jason.encode!(%{name: file_name}), content_type: "application/json"},
+      data: {file_data, content_type: "application/octet-stream"}
+    ]
+
+    request(
+      method: :post,
+      url: "/upload/storage/v1/b/#{encode_segment(bucket(opts))}/o",
+      params: params,
+      form_multipart: body
+    )
+    |> handle_response(:json)
+  end
 
   def get_file(file_path, opts \\ []) do
-    bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    conn = get_connection()
-
-    GoogleApi.Storage.V1.Api.Objects.storage_objects_get(
-      conn,
-      bucket,
-      file_path
-    )
+    request(method: :get, url: object_url(file_path, opts))
+    |> handle_response(:json)
   end
 
-  def get_public_url(%{data: %{name: name, path: path,extension: ext}}=unit,opts \\ []) do
+  def get_public_url(%{data: %{name: name, path: path, extension: ext}} = unit, opts \\ []) do
     bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    {:ok, "https://storage.googleapis.com/#{bucket}/#{path}/#{name}"}
+
+    {:ok,
+     %{signed_url: "https://storage.googleapis.com/#{bucket}/#{path}/#{name}", expiration: nil}}
   end
-  def get_public_url(_unit,_opts), do: Error.create(:storage,"invalid unit")
+
+  def get_public_url(_unit, _opts), do: Error.create(:storage, "invalid unit")
 
   def delete_file(file_path, opts \\ []) do
-    bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-    conn = get_connection()
-
-    GoogleApi.Storage.V1.Api.Objects.storage_objects_delete(
-      conn,
-      bucket,
-      file_path
-    )
+    request(method: :delete, url: object_url(file_path, opts))
+    |> handle_response(:raw)
   end
 
+  @doc """
+  A V2 signed url for the object, signed with the service account key.
+
+  Requires service account credentials: metadata server and gcloud user
+  credentials have no private key to sign with.
+  """
   def get_bucket_file_signed_url(file_path, opts \\ []) do
-    gcp_service_account = opts[:service_account] || System.get_env("STORAGE_SERVICE_ACCOUNT")
-    bucket = opts[:bucket] || System.get_env("DEFAULT_BUCKET")
-
-    %Tesla.Client{pre: [{Tesla.Middleware.Headers, :call, [auth_headers]}]} = get_connection()
-    headers = [{"Content-Type", "application/json"}] ++ auth_headers
-
-    url =
-      "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/#{gcp_service_account}:signBlob"
+    if opts[:service_account] do
+      Logger.warning(
+        "service_account option is ignored: urls are signed as the credentials' client_email"
+      )
+    end
 
     expires = DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(1 * 3600)
-    resource = "/#{bucket}/#{URI.encode(file_path)}"
-    signature = ["GET", "", "", expires, resource] |> Enum.join("\n") |> Base.encode64()
-    body = %{"payload" => signature} |> Poison.encode!()
-    case HTTPoison.post(url, body, headers) do
-      {:ok, %{status_code: 200, body: result}} ->
-        %{"signedBlob" => signed_blob} = Poison.decode!(result)
+    resource = "/#{bucket(opts)}/#{URI.encode(file_path)}"
+    string_to_sign = ["GET", "", "", expires, resource] |> Enum.join("\n")
+
+    case Auth.signer() do
+      {:ok, {client_email, pem}} ->
+        signature =
+          string_to_sign
+          |> :public_key.sign(:sha256, Auth.private_key(pem))
+          |> Base.encode64()
+
         qs =
           %{
-            "GoogleAccessId" => gcp_service_account,
+            "GoogleAccessId" => client_email,
             "Expires" => expires,
-            "Signature" => signed_blob
+            "Signature" => signature
           }
           |> URI.encode_query()
 
-        {:ok, Enum.join(["https://storage.googleapis.com#{resource}", "?", qs])}
-        {:ok,%{status_code: 403}=err} ->
-           {:error,"Forbidden resource"}
-      {:ok, e} ->
-        IO.inspect(e)
-        {:error,"error on signed url"}
+        {:ok,
+         %{
+           signed_url: Enum.join(["#{@storage_base_url}#{resource}", "?", qs]),
+           expiration: expires
+         }}
+
+      {:error, reason} ->
+        Logger.warning("error on gcp signed url: #{inspect(reason)}")
+        {:error, "error on signed url"}
     end
   end
 
-  defp get_connection() do
-    {:ok, token} = Goth.Token.fetch([])
-    GoogleApi.Storage.V1.Connection.new(token.token)
+  # Req retries safe requests by default; keep every call one-shot and bounded.
+  defp request(opts) do
+    {:ok, token} = Auth.token()
+
+    Req.request(
+      [
+        base_url: @storage_base_url,
+        headers: [
+          {"authorization", "Bearer #{token}"},
+          {"x-goog-api-client", api_client()}
+        ],
+        retry: false,
+        receive_timeout: 5_000,
+        connect_options: [timeout: 8_000]
+      ] ++ opts
+    )
   end
 
+  defp api_client(), do: "gl-elixir/#{System.version()} arke/#{Application.spec(:arke, :vsn)}"
+
+  defp bucket(opts), do: opts[:bucket] || System.get_env("DEFAULT_BUCKET")
+
+  defp object_url(file_path, opts),
+    do: "/storage/v1/b/#{encode_segment(bucket(opts))}/o/#{encode_segment(file_path)}"
+
+  defp encode_segment(value), do: URI.encode(value, &URI.char_unreserved?/1)
+
+  defp handle_response({:error, reason}, _), do: {:error, reason}
+
+  defp handle_response({:ok, %{status: status} = response}, _)
+       when status < 200 or status >= 300,
+       do: {:error, response}
+
+  defp handle_response({:ok, response}, :raw), do: {:ok, response}
+  defp handle_response({:ok, %{body: body}}, :json) when body in [nil, ""], do: {:ok, nil}
+  # Req decodes the JSON body from the response content-type.
+  defp handle_response({:ok, %{body: body}}, :json), do: {:ok, body}
 end

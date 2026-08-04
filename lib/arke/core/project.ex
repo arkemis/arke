@@ -22,7 +22,8 @@ defmodule Arke.Core.Project do
 
   @persistence Application.get_env(:arke, :persistence)
 
-  arke id: :arke_project do  end
+  arke id: :arke_project do
+  end
 
   def on_create(_, unit) do
     persistence_fn = @persistence[:arke_postgres][:create_project]

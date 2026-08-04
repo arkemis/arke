@@ -112,7 +112,7 @@ defmodule Arke.Boundary.GroupManager do
 
   defp check_group_parameters(group_parameters, arke_parameters) do
     arke_ids = Enum.map(arke_parameters, fn p -> p.id end)
-    group_parameters -- group_parameters -- arke_ids
+    group_parameters -- (group_parameters -- arke_ids)
   end
 
   defp link_init(project, :arke_list, child_id, metadata) do

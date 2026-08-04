@@ -1,5 +1,5 @@
 defmodule StructManagerTest do
-  use Arke.RepoCase
+  use Arke.Test.RepoCase
 
   @base_keys [:id, :arke_id, :inserted_at, :updated_at, :metadata]
 
@@ -116,6 +116,30 @@ defmodule StructManagerTest do
       assert Enum.all?(keys, &(&1 == true)) == true
     end
 
+    test "encode normalises inserted_at and updated_at to UTC datetimes" do
+      model = ArkeManager.get(:test_arke_struct, :test_schema)
+
+      opts =
+        get_parameter_values_decode()
+        |> Keyword.put(:inserted_at, "2022-10-31T16:44:19")
+        |> Keyword.put(:updated_at, ~N[2023-01-02 03:04:05])
+
+      struct = StructManager.encode(Unit.load(model, opts), type: :json)
+
+      assert struct.inserted_at == ~U[2022-10-31 16:44:19Z]
+      assert struct.updated_at == ~U[2023-01-02 03:04:05Z]
+    end
+
+    test "encode keeps nil timestamps as nil" do
+      model = ArkeManager.get(:test_arke_struct, :test_schema)
+      unit = Unit.load(model, get_parameter_values_decode())
+
+      struct = StructManager.encode(unit, type: :json)
+
+      assert struct.inserted_at == nil
+      assert struct.updated_at == nil
+    end
+
     test "encode (nil data)" do
       model = ArkeManager.get(:test_arke_struct, :test_schema)
       unit = Unit.load(model, get_parameter_values_decode())
@@ -175,7 +199,7 @@ defmodule StructManagerTest do
       struct_dt = StructManager.decode(:test_schema, :test_arke_struct, values, :json)
 
       assert struct_dt.data.datetime_struct_test ==
-               "must be %DateTime | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
+               "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
     end
 
     test "get_struct" do

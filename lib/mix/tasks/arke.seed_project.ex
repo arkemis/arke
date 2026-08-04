@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Arke.SeedProject do
   alias Arke.QueryManager
   alias Arke.LinkManager
   alias Arke.Utils.ErrorGenerator, as: Error
-  alias Arke.Boundary.{ArkeManager}
+  alias Arke.Boundary.{ArkeManager, GroupManager}
 
   alias Arke.Core.Unit
   @decode_keys [:arke, :parameter, :group, :link]
@@ -509,7 +509,16 @@ defmodule Mix.Tasks.Arke.SeedProject do
         ]
       end)
 
-    handle_link(group_link, project, [])
+    # every group has a `arke_list` field that stores the arke ids it contains.
+    # Must be updated and the link will be handled automatically
+    complete_arke_list =
+      ((current_group_model.data.arke_list -- arke_to_remove_ids) ++ arke_to_add_ids)
+      |> Enum.uniq()
+
+    QueryManager.get_by(project: project, id: current_group_model.id)
+    |> QueryManager.update(arke_list: complete_arke_list)
+
+    []
   end
 
   defp create_error(context, msg) do
