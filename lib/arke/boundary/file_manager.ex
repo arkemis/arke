@@ -22,7 +22,6 @@ defmodule Arke.Boundary.FileManager do
   require Logger
 
   @table :file_manager_cache
-  @compile {:parse_transform, :ms_transform}
   @one_hour :timer.hours(1)
 
   def start_link(state \\ []) do
@@ -55,9 +54,9 @@ defmodule Arke.Boundary.FileManager do
   end
 
   def get_all(project) do
-    fun = :ets.fun2ms(fn {{unit_id, ^project}, entry} -> {unit_id, entry} end)
+    spec = [{{{:"$1", project}, :"$2"}, [], [{{:"$1", :"$2"}}]}]
 
-    :ets.select(@table, fun)
+    :ets.select(@table, spec)
     |> Enum.map(fn {unit_id, entry} -> Map.put(entry, :unit_id, unit_id) end)
   end
 
@@ -79,14 +78,11 @@ defmodule Arke.Boundary.FileManager do
   def handle_info(:cleanup, state) do
     now = System.os_time(:second)
 
-    fun = :ets.fun2ms(fn {key, %{expiration: expiration}} when expiration < now -> key end)
+    spec = [{{:_, %{expiration: :"$1"}}, [{:<, :"$1", now}], [true]}]
+    purged = :ets.select_delete(@table, spec)
 
-    expired = :ets.select(@table, fun)
-
-    Enum.each(expired, &:ets.delete(@table, &1))
-
-    if length(expired) > 0 do
-      Logger.debug("FileManager: purged #{length(expired)} expired entries")
+    if purged > 0 do
+      Logger.debug("FileManager: purged #{purged} expired entries")
     end
 
     schedule_cleanup()

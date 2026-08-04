@@ -9,10 +9,10 @@ defmodule Arke.Errors.ArkeError do
     "context: #{context}, message: #{message}"
   end
 
-  def message(%{message: [%{context: context, message: message}]} = exception),
+  def message(%{message: [%{context: context, message: message}]} = _exception),
     do: "context: #{context}, message: #{message}"
 
-  def message(%{message: errors} = exception) when is_list(errors) do
+  def message(%{message: errors} = _exception) when is_list(errors) do
     formatted_errors =
       errors
       |> Enum.map(&format_error/1)

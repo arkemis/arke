@@ -47,6 +47,9 @@ jobs:
       - name: Ensure files are formatted
         run: mix format --check-formatted
         if: ${{ matrix.lint }}
+      - name: Compile without warnings
+        run: mix compile --force --warnings-as-errors
+        if: ${{ matrix.lint }}
       - name: Build package
         run: mix hex.build
       - name: Run tests

@@ -109,8 +109,8 @@ defmodule Arke.System do
           existing_units = get_existing_units_for_import(project, arke, header, correct_units)
 
           units_args =
-            Enum.filter(correct_units, fn u ->
-              check_existing_units_for_import(project, arke, header, u, existing_units) == false
+            Enum.reject(correct_units, fn u ->
+              check_existing_units_for_import(project, arke, header, u, existing_units)
             end)
 
           {existing_units, units_args, error_units} =

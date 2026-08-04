@@ -41,12 +41,4 @@ defmodule Arke.Application do
 
     link
   end
-
-  defp postfix() do
-    System.get_env("POSTFIX") || random_string()
-  end
-
-  defp random_string() do
-    :crypto.strong_rand_bytes(5) |> Base.encode32()
-  end
 end

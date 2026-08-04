@@ -46,10 +46,10 @@ defmodule Arke.Utils.Export do
     end
   end
 
-  defp get_arke(project, nil), do: []
+  defp get_arke(_project, nil), do: []
   defp get_arke(project, _), do: QueryManager.filter_by(project: project, arke_id: "arke")
 
-  defp get_parameter(project, nil), do: []
+  defp get_parameter(_project, nil), do: []
 
   defp get_parameter(project, _),
     do:
@@ -58,7 +58,7 @@ defmodule Arke.Utils.Export do
         arke_id__in: Arke.Utils.DefaultData.get_parameters_id()
       )
 
-  defp get_group(project, nil), do: []
+  defp get_group(_project, nil), do: []
   defp get_group(project, _), do: QueryManager.filter_by(project: project, arke_id: "group")
 
   defp get_permission(project) do
@@ -83,7 +83,7 @@ defmodule Arke.Utils.Export do
 
     p_list = Arke.Utils.DefaultData.get_parameters_id()
 
-    parsed_data =
+    _parsed_data =
       Enum.reduce(data, %{arke: [], group: [], parameter: []}, fn unit, acc ->
         parse_data(unit, to_string(unit.arke_id), p_list, acc)
       end)

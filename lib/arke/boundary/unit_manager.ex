@@ -19,7 +19,6 @@ defmodule Arke.Boundary.UnitManager do
       require Logger
       alias Arke.Core.Unit
       alias Arke.Utils.ErrorGenerator, as: Error
-      @compile {:parse_transform, :ms_transform}
 
       Module.register_attribute(__MODULE__, :manager_id, accumulate: false, persist: true)
 
@@ -48,12 +47,9 @@ defmodule Arke.Boundary.UnitManager do
       end
 
       def get_all(project \\ :arke_system) do
-        fun =
-          :ets.fun2ms(fn {{unit_id, project_id}, _unit} when project_id == project ->
-            {unit_id, project_id}
-          end)
+        spec = [{{{:"$1", project}, :_}, [], [{{:"$1", {:const, project}}}]}]
 
-        :ets.select(manager_id(), fun)
+        :ets.select(manager_id(), spec)
       end
 
       def get(unit_id, _) when is_nil(unit_id), do: nil
@@ -208,6 +204,7 @@ defmodule Arke.Boundary.UnitManager do
       ######
 
       # Update Unit
+      @impl true
       def handle_call({:create, %{metadata: metadata} = unit, project}, _from, state) do
         unit = Unit.update(unit, metadata: Map.put(metadata, :project, project))
         :ets.insert(manager_id(), {{unit.id, project}, unit})
@@ -215,6 +212,7 @@ defmodule Arke.Boundary.UnitManager do
       end
 
       # Update Unit
+      @impl true
       def handle_call({:update, new_unit, project}, _from, state) do
         :ets.insert(manager_id(), {{new_unit.id, project}, new_unit})
         {:reply, new_unit, state}
@@ -223,6 +221,7 @@ defmodule Arke.Boundary.UnitManager do
       # Call handle link
 
       # Add link
+      @impl true
       def handle_call(
             {:add_link, %{data: data, metadata: %{project: project}} = unit, parameter_id,
              child_id, metadata},
@@ -248,7 +247,10 @@ defmodule Arke.Boundary.UnitManager do
 
       # Update all nodes manager
       defp call_nodes_manager(manager, func_name, opts) do
-        tuple_data = Enum.reduce(opts, {func_name}, fn opt, acc -> Tuple.append(acc, opt) end)
+        tuple_data =
+          Enum.reduce(opts, {func_name}, fn opt, acc ->
+            Tuple.insert_at(acc, tuple_size(acc), opt)
+          end)
 
         {right_nodes, bad_nodes} =
           :rpc.multicall(Node.list(), GenServer, :call, [manager, tuple_data])
@@ -263,6 +265,7 @@ defmodule Arke.Boundary.UnitManager do
       end
 
       # Remove link
+      @impl true
       def handle_call(
             {:remove_link, %{data: data, metadata: %{project: project}} = unit, parameter_id,
              child_id},
@@ -281,10 +284,12 @@ defmodule Arke.Boundary.UnitManager do
         {:reply, unit, state}
       end
 
+      @impl true
       def handle_info({:EXIT, _from, reason}, state) do
-        Logger.warn("Tracking #{state.name} - Stopped with reason #{inspect(reason)}")
+        Logger.warning("Tracking #{state.name} - Stopped with reason #{inspect(reason)}")
       end
 
+      @impl true
       def terminate(reason, _s) do
         IO.inspect({self(), reason}, label: :terminate)
         :ok

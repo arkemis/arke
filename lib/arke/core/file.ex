@@ -19,7 +19,8 @@ defmodule Arke.Core.File do
 
   use Arke.System
 
-  alias Arke.Boundary.{ArkeManager, FileManager}
+  alias Arke.Boundary.FileManager
+  require Logger
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
 
@@ -32,7 +33,7 @@ defmodule Arke.Core.File do
   end
 
   def before_load(
-        %{path: path, content_type: content_type, filename: filename} = _unit,
+        %{path: path, content_type: _content_type, filename: filename} = _unit,
         :create
       ) do
     {:ok, file_stat} = File.stat(path)
@@ -54,11 +55,11 @@ defmodule Arke.Core.File do
 
   def before_load(opts, _persistence_fn), do: {:ok, opts}
 
-  def on_struct_encode(arke, %{metadata: %{project: project}} = unit, data, opts) do
+  def on_struct_encode(_arke, %{metadata: %{project: _project}} = unit, data, opts) do
     load_files = Keyword.get(opts, :load_files, false)
 
     with true <- load_files,
-         {:ok, %{signed_url: signed_url} = opts} <- get_url(unit) do
+         {:ok, %{signed_url: signed_url} = _opts} <- get_url(unit) do
       data = Map.put(data, :signed_url, signed_url)
       {:ok, Map.put(data, :signed_url, signed_url)}
     else
@@ -66,7 +67,7 @@ defmodule Arke.Core.File do
         {:ok, data}
 
       {:error, msg} ->
-        Logger.warn("error while loading the image: #{msg}")
+        Logger.warning("error while loading the image: #{msg}")
         {:ok, data}
     end
   end

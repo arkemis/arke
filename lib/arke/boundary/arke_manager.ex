@@ -23,29 +23,26 @@ defmodule Arke.Boundary.ArkeManager do
   manager_id(:arke)
   # set_supervisor_name(:arke_supervisor)
 
-  def before_create(%{id: id, data: data, metadata: unit_metadata} = unit, project) do
+  def before_create(%{id: _id, data: _data, metadata: _unit_metadata} = unit, project) do
     unit = check_module(unit)
 
     {unit, project}
   end
 
-  def get_parameters(%{data: data, metadata: %{project: project}} = unit) do
+  def get_parameters(%{data: data, metadata: %{project: project}} = _unit) do
     Enum.reduce(data.parameters, [], fn %{
                                           id: parameter_id,
                                           metadata: parameter_metadata
                                         },
                                         new_parameters ->
       case init_parameter(project, parameter_id, parameter_metadata) do
-        {:error, msg} -> new_parameters
+        {:error, _msg} -> new_parameters
         parameter -> [parameter | new_parameters]
       end
     end)
   end
 
-  def get_parameter(%{id: id} = unit, project, parameter_id),
-    do: get_parameter(id, project, parameter_id)
-
-  def get_parameter(%{id: id, metadata: %{project: project}} = unit, parameter_id),
+  def get_parameter(%{id: id} = _unit, project, parameter_id),
     do: get_parameter(id, project, parameter_id)
 
   def get_parameter(unit_id, project, parameter_id) when is_binary(parameter_id),
@@ -53,21 +50,24 @@ defmodule Arke.Boundary.ArkeManager do
 
   def get_parameter(unit_id, project, parameter_id) when is_atom(parameter_id) do
     case get(unit_id, project) do
-      {:error, msg} ->
+      {:error, _msg} ->
         nil
 
-      %{id: id, data: data} ->
+      %{id: _id, data: data} ->
         with %{id: id, metadata: metadata} <-
                Enum.find(data.parameters, {:error, "parameter id not found"}, fn f ->
                  f.id == parameter_id
                end),
              %Unit{} = parameter <- init_parameter(project, id, metadata),
              do: parameter,
-             else: ({:error, msg} -> nil)
+             else: ({:error, _msg} -> nil)
     end
   end
 
-  def get_parameter(unit_id, project, %Unit{} = parameter), do: parameter
+  def get_parameter(_unit_id, _project, %Unit{} = parameter), do: parameter
+
+  def get_parameter(%{id: id, metadata: %{project: project}} = _unit, parameter_id),
+    do: get_parameter(id, project, parameter_id)
 
   def update_parameter(unit_id, parameter_id, project, metadata) when is_binary(parameter_id),
     do: update_parameter(unit_id, String.to_existing_atom(parameter_id), project, metadata)
@@ -80,7 +80,7 @@ defmodule Arke.Boundary.ArkeManager do
       {:error, msg} ->
         Error.create(:unit, msg)
 
-      %{id: id, data: data} = arke ->
+      %{id: _id, data: data} = arke ->
         parameters =
           Enum.map(data.parameters, fn x ->
             if x.id == parameter_id, do: Map.put(x, :metadata, metadata), else: x
@@ -96,23 +96,6 @@ defmodule Arke.Boundary.ArkeManager do
 
   defp check_module(unit), do: unit
 
-  defp init_parameter(project, id, metadata, p) do
-    arke_id = Map.get(p, :arke, nil)
-
-    metadata = Enum.into(metadata, %{})
-
-    Unit.new(
-      id,
-      metadata,
-      arke_id,
-      nil,
-      %{},
-      nil,
-      nil,
-      nil
-    )
-  end
-
   defp init_parameter(project, id, metadata) do
     case Arke.Boundary.ParameterManager.get(id, project) do
       nil ->
@@ -122,17 +105,17 @@ defmodule Arke.Boundary.ArkeManager do
         Error.create(:parameter, msg)
 
       parameter ->
-        parameter = handle_init_p(id, parameter, metadata)
+        _parameter = handle_init_p(id, parameter, metadata)
     end
   end
 
-  defp handle_init_p(id, nil, metadata) do
+  defp handle_init_p(_id, nil, _metadata) do
     nil
   end
 
-  defp handle_init_p(id, parameter, override_data) do
+  defp handle_init_p(_id, parameter, override_data) do
     Map.update(parameter, :data, %{}, fn v ->
-      Map.merge(v, override_data, fn _k, pdata, ovdata -> ovdata end)
+      Map.merge(v, override_data, fn _k, _pdata, ovdata -> ovdata end)
     end)
   end
 end

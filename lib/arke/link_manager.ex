@@ -14,14 +14,15 @@
 
 defmodule Arke.LinkManager do
   @moduledoc false
-  @record_fields [:id, :data, :metadata, :inserted_at, :updated_at]
 
   alias Arke.Boundary.ArkeManager
   alias Arke.Utils.ErrorGenerator, as: Error
   alias Arke.QueryManager
   alias Arke.Core.Unit
 
-  def add_node(project, %Unit{} = parent, %Unit{} = child, type \\ "link", metadata \\ %{}) do
+  def add_node(project, parent, child, type \\ "link", metadata \\ %{})
+
+  def add_node(project, %Unit{} = parent, %Unit{} = child, type, metadata) do
     arke_link = ArkeManager.get(:arke_link, project)
 
     case check_link(project, parent, child, type, arke_link) do
@@ -71,7 +72,9 @@ defmodule Arke.LinkManager do
   def update_node(_project, _parent, _child, _type, _metadata),
     do: Error.create(:link, "invalid parameters")
 
-  def delete_node(project, %Unit{} = parent, %Unit{} = child, type, metadata \\ %{}) do
+  def delete_node(project, parent, child, type, metadata \\ %{})
+
+  def delete_node(project, %Unit{} = parent, %Unit{} = child, type, _metadata) do
     arke_link = ArkeManager.get(:arke_link, :arke_system)
 
     case check_link(project, parent, child, type, arke_link) do
