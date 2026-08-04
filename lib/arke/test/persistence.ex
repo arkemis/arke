@@ -93,6 +93,15 @@ defmodule Arke.Test.Persistence do
     create(project, new_unit)
   end
 
+  @doc """
+  Mirrors the repo's `insert_all/3`; sends the call to the caller for `assert_received`.
+  """
+  @spec insert_all(String.t(), [keyword()], keyword()) :: {non_neg_integer(), nil}
+  def insert_all(table, rows, opts) do
+    send(self(), {:insert_all, table, rows, opts})
+    {length(rows), nil}
+  end
+
   @spec delete(atom(), Unit.t()) :: {:ok, nil}
   def delete(project, %Unit{} = unit) do
     :ets.delete(@table, key(project, unit))
