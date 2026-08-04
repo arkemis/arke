@@ -228,8 +228,6 @@ defmodule Arke.Boundary.UnitManager do
             _from,
             state
           ) do
-
-
         opts =
           %{}
           |> Map.put(parameter_id, [
