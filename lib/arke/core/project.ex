@@ -19,6 +19,7 @@ defmodule Arke.Core.Project do
   """
 
   use Arke.System
+  alias Arke.Utils.ErrorGenerator, as: Error
 
   @persistence Application.compile_env(:arke, :persistence)
 
@@ -27,8 +28,11 @@ defmodule Arke.Core.Project do
 
   def on_create(_, unit) do
     persistence_fn = @persistence[:arke_postgres][:create_project]
-    unit |> persistence_fn.()
-    {:ok, unit}
+
+    case persistence_fn.(unit) do
+      :error -> Error.create(:project, "cannot create project schema")
+      _ -> {:ok, unit}
+    end
   end
 
   def on_delete(_, unit) do

@@ -37,6 +37,8 @@ defmodule Arke.QueryManager do
     - in =>  value is in a collection => `IN`
 
   """
+  require Logger
+
   alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager}
   alias Arke.Validator
   alias Arke.LinkManager
@@ -752,42 +754,75 @@ defmodule Arke.QueryManager do
     ArkeManager.get_parameter(arke, project, key)
   end
 
-  defp handle_link_parameters(
+  # Definition units (arkes, groups, parameters) keep best-effort sync: their
+  # link targets (base parameters, system arkes) live in :arke_system, not in
+  # the project, so strictness would fail every definition create.
+  defp handle_link_parameters(%{arke_id: arke_id, metadata: %{project: project}} = unit, old_data) do
+    if definition_unit?(arke_id, project) do
+      case do_handle_link_parameters(unit, old_data) do
+        {:error, errors} ->
+          Logger.warning("link sync failed for `#{unit.id}`: #{inspect(errors)}")
+          {:ok, unit}
+
+        ok ->
+          ok
+      end
+    else
+      do_handle_link_parameters(unit, old_data)
+    end
+  end
+
+  defp definition_unit?(arke_id, _project) when arke_id in [:arke, :group], do: true
+
+  defp definition_unit?(arke_id, project) do
+    case ArkeManager.get(arke_id, project) do
+      nil -> false
+      arke -> Enum.any?(GroupManager.get_groups_by_arke(arke), &(&1.id == :parameter))
+    end
+  end
+
+  defp do_handle_link_parameters(
          %{arke_id: arke_id, metadata: %{project: project}, data: new_data, id: _id} = unit,
          old_data
        ) do
     arke = ArkeManager.get(arke_id, project)
 
     Enum.filter(ArkeManager.get_parameters(arke), fn p -> p.arke_id == :link end)
-    |> Enum.each(fn p ->
+    |> Enum.reduce_while({:ok, unit}, fn p, acc ->
       old_value = Map.get(old_data, p.id, nil)
       new_value = Map.get(new_data, p.id, nil)
-      handle_link_parameter(unit, p, old_value, new_value)
-    end)
 
-    {:ok, unit}
+      case handle_link_parameter(unit, p, old_value, new_value) do
+        {:error, errors} -> {:halt, {:error, errors}}
+        _ -> {:cont, acc}
+      end
+    end)
   end
 
   defp handle_link_parameter(_, nil, _, _), do: nil
 
   defp handle_link_parameter(unit, %{data: %{multiple: false}} = parameter, old_value, new_value) do
-    update_parameter_link(
-      unit,
-      parameter,
-      normalize_value(old_value),
-      :delete,
-      old_value == new_value
-    )
-
-    update_parameter_link(
-      unit,
-      parameter,
-      normalize_value(new_value),
-      :add,
-      old_value == new_value
-    )
-
-    {:ok, unit}
+    with {:ok, _} <-
+           link_result(
+             update_parameter_link(
+               unit,
+               parameter,
+               normalize_value(old_value),
+               :delete,
+               old_value == new_value
+             )
+           ),
+         {:ok, _} <-
+           link_result(
+             update_parameter_link(
+               unit,
+               parameter,
+               normalize_value(new_value),
+               :add,
+               old_value == new_value
+             )
+           ),
+         do: {:ok, unit}
   end
 
   defp handle_link_parameter(unit, %{data: %{multiple: true}} = parameter, old_value, new_value) do
@@ -799,16 +834,22 @@ defmodule Arke.QueryManager do
 
     nodes_to_add = Enum.map(new_value -- old_value, &normalize_value(&1))
 
-    Enum.each(nodes_to_delete, fn n ->
-      update_parameter_link(unit, parameter, n, :delete, false)
-    end)
-
-    Enum.each(nodes_to_add, fn n ->
-      update_parameter_link(unit, parameter, n, :add, false)
-    end)
-
-    {:ok, unit}
+    with {:ok, _} <- update_parameter_links(unit, parameter, nodes_to_delete, :delete),
+         {:ok, _} <- update_parameter_links(unit, parameter, nodes_to_add, :add),
+         do: {:ok, unit}
   end
+
+  defp update_parameter_links(unit, parameter, nodes, action) do
+    Enum.reduce_while(nodes, {:ok, unit}, fn n, acc ->
+      case link_result(update_parameter_link(unit, parameter, n, action, false)) do
+        {:error, errors} -> {:halt, {:error, errors}}
+        _ -> {:cont, acc}
+      end
+    end)
+  end
+
+  defp link_result({:error, errors}), do: {:error, errors}
+  defp link_result(_), do: {:ok, nil}
 
   defp update_parameter_link(_, _, _, _, true), do: nil
   defp update_parameter_link(_, _, nil, _, _), do: nil

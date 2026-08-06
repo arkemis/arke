@@ -35,6 +35,23 @@ defmodule Arke.Test.CreateArke do
     )
 
     parameter(:boolean_support, :boolean, required: false, default_boolean: false)
+
+    parameter(:link_support, :link,
+      required: false,
+      multiple: false,
+      arke_or_group_id: "arke_test_support",
+      connection_type: "test_link",
+      direction: "child"
+    )
+
+    parameter(:multi_link_support, :link,
+      required: false,
+      multiple: true,
+      arke_or_group_id: "arke_test_support",
+      connection_type: "test_multi_link",
+      direction: "child"
+    )
+
     parameter(:list_support, :list, required: false, default_list: ["list", "of", "values"])
     parameter(:dict_support, :dict, required: false, default_dict: %{starting: "value"})
     parameter(:date_support, :date, default_date: ~D[1999-11-08])
@@ -268,8 +285,60 @@ defmodule Arke.Test.CreateArke do
         nil
       )
 
+    link_support =
+      Unit.new(
+        :link_support,
+        Map.merge(
+          base_parameter(label: "link_support"),
+          %{
+            multiple: false,
+            unique: false,
+            arke_or_group_id: "arke_test_support",
+            connection_type: "test_link",
+            direction: "child",
+            default_link: nil,
+            depth: 0,
+            filter_keys: ["id", "arke_id"],
+            only_run_time: false
+          }
+        ),
+        :link,
+        nil,
+        %{},
+        nil,
+        nil,
+        nil
+      )
+
+    multi_link_support =
+      Unit.new(
+        :multi_link_support,
+        Map.merge(
+          base_parameter(label: "multi_link_support"),
+          %{
+            multiple: true,
+            unique: false,
+            arke_or_group_id: "arke_test_support",
+            connection_type: "test_multi_link",
+            direction: "child",
+            default_link: nil,
+            depth: 0,
+            filter_keys: ["id", "arke_id"],
+            only_run_time: false
+          }
+        ),
+        :link,
+        nil,
+        %{},
+        nil,
+        nil,
+        nil
+      )
+
     parameters = [
       string_support,
+      link_support,
+      multi_link_support,
       dict_support,
       date_support,
       datetime_support,

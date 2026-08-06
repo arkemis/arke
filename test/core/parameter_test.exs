@@ -1043,30 +1043,24 @@ defmodule Arke.Core.ParameterTest do
                nil
     end
 
-    test "create unit" do
+    test "create unit with a missing link target returns {:error, _}" do
       arke_model = ArkeManager.get(:test_arke_parameter, :test_schema)
 
-      {:ok, unit} =
-        QueryManager.create(:test_schema, arke_model, %{
-          link_test: ["to define"],
-          label: "First link unit"
-        })
-
-      assert unit.data.link_test == ["to define"]
+      assert {:error, _} =
+               QueryManager.create(:test_schema, arke_model, %{
+                 link_test: ["to define"],
+                 label: "First link unit"
+               })
     end
 
-    # TODO: link values are not validated. Once a validator exists for the link
-    # type this should assert {:error, ...} instead of a successful create.
-    test "create unit (invalid value is not rejected)" do
+    test "create unit with an invalid link value returns {:error, _}" do
       arke_model = ArkeManager.get(:test_arke_parameter, :test_schema)
 
-      {:ok, unit} =
-        QueryManager.create(:test_schema, arke_model, %{
-          link_test: "31-01-1999",
-          label: "First link unit"
-        })
-
-      assert unit.data.link_test == "31-01-1999"
+      assert {:error, _} =
+               QueryManager.create(:test_schema, arke_model, %{
+                 link_test: "31-01-1999",
+                 label: "First link unit"
+               })
     end
 
     test "delete" do
