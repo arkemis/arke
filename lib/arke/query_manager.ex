@@ -127,6 +127,56 @@ defmodule Arke.QueryManager do
   defp parse_link_direction(direction), do: direction
 
   @doc """
+  Runs `fun` inside a database transaction.
+
+  Every `Arke.QueryManager` write performed inside `fun` joins the
+  transaction; their `after_commit` hooks defer to the outermost commit.
+  Returning `{:error, reason}` from `fun` rolls everything back and returns
+  `{:error, reason}`; `{:ok, value}` commits and returns `{:ok, value}`.
+
+  ## Options
+    - `timeout:` => transaction timeout in ms, passed to the adapter
+
+  ## Example
+      iex> Arke.QueryManager.transaction(:my_project, fn ->
+      ...>   with {:ok, a} <- QueryManager.create(...),
+      ...>        {:ok, b} <- QueryManager.update(...),
+      ...>        do: {:ok, {a, b}}
+      ...> end, timeout: 600_000)
+  """
+  @spec transaction(project :: atom(), fun :: (-> any()), opts :: keyword()) ::
+          {:ok, any()} | {:error, any()}
+  def transaction(project, fun, opts \\ [])
+
+  def transaction(_project, fun, opts) do
+    transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
+
+    AfterCommit.begin()
+
+    result =
+      try do
+        transaction_fn.(fun, opts)
+      rescue
+        e ->
+          AfterCommit.finish()
+          AfterCommit.drop()
+          reraise e, __STACKTRACE__
+      end
+
+    AfterCommit.finish()
+
+    case result do
+      {:error, _} = error ->
+        AfterCommit.drop()
+        error
+
+      other ->
+        AfterCommit.flush()
+        other
+    end
+  end
+
+  @doc """
   Function to create an element
 
   ## Parameters
@@ -383,10 +433,16 @@ defmodule Arke.QueryManager do
     {project, opts} = Keyword.pop!(opts, :project)
     {arke, opts} = Keyword.pop(opts, :arke, nil)
     {distinct, opts} = Keyword.pop(opts, :distinct, nil)
+    {lock, opts} = Keyword.pop(opts, :lock, false)
+
+    if lock and AfterCommit.depth() == 0,
+      do: raise(ArgumentError, "lock: is only valid inside a transaction")
 
     arke = get_arke(arke, project)
 
-    query(project: project, arke: arke, distinct: distinct) |> where(opts)
+    query(project: project, arke: arke, distinct: distinct)
+    |> Query.set_lock(lock)
+    |> where(opts)
   end
 
   defp get_arke(nil, _), do: nil

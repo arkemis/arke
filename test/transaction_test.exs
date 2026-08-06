@@ -75,6 +75,75 @@ defmodule Arke.TransactionTest do
     assert Unit.get_value(stored, :multi_link_support) in [nil, []]
   end
 
+  describe "QueryManager.transaction/3" do
+    test "commits the writes and returns {:ok, _}" do
+      assert {:ok, unit} =
+               QueryManager.transaction(@project, fn ->
+                 QueryManager.create(@project, hook_arke(), id: "txn_api_commit")
+               end)
+
+      assert unit.id == :txn_api_commit
+      assert QueryManager.get_by(project: @project, id: "txn_api_commit") != nil
+    end
+
+    test "rolls back every write when the function returns {:error, _}" do
+      assert {:error, :nope} =
+               QueryManager.transaction(@project, fn ->
+                 {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_api_a")
+                 {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_api_b")
+                 {:error, :nope}
+               end)
+
+      assert QueryManager.get_by(project: @project, id: "txn_api_a") == nil
+      assert QueryManager.get_by(project: @project, id: "txn_api_b") == nil
+    end
+
+    test "after_commit hooks defer to the outermost commit" do
+      {:ok, _} =
+        QueryManager.transaction(@project, fn ->
+          {:ok, unit} = QueryManager.create(@project, hook_arke(), id: "txn_defer")
+
+          messages = drain()
+          assert {:hook, :after_write, :create} in messages
+          refute {:hook, :after_commit, :create} in messages
+
+          {:ok, unit}
+        end)
+
+      assert {:hook, :after_commit, :create} in drain()
+    end
+
+    test "a rolled-back transaction drops the queued after_commit entries" do
+      {:error, :nope} =
+        QueryManager.transaction(@project, fn ->
+          {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_dropped")
+          {:error, :nope}
+        end)
+
+      refute {:hook, :after_commit, :create} in drain()
+    end
+  end
+
+  describe "lock:" do
+    test "raises outside a transaction" do
+      assert_raise ArgumentError, ~r/only valid inside a transaction/, fn ->
+        QueryManager.get_by(project: @project, id: "whatever", lock: true)
+      end
+    end
+
+    test "is accepted inside a transaction" do
+      {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_lock")
+      drain()
+
+      assert {:ok, unit} =
+               QueryManager.transaction(@project, fn ->
+                 {:ok, QueryManager.get_by(project: @project, id: "txn_lock", lock: true)}
+               end)
+
+      assert unit.id == :txn_lock
+    end
+  end
+
   test "after_commit still flushes for a transaction-opted-out arke" do
     arke_project = ArkeManager.get(:arke_project, :arke_system)
 
