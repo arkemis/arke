@@ -43,7 +43,7 @@ defmodule Arke.QueryManager do
   alias Arke.Validator
   alias Arke.LinkManager
   alias Arke.Hook
-  alias Arke.Hook.Pipeline
+  alias Arke.Hook.{AfterCommit, Pipeline}
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
   alias Arke.Errors.ArkeError
   alias Arke.Utils.ErrorGenerator, as: Error
@@ -181,10 +181,6 @@ defmodule Arke.QueryManager do
 
     case length(errors) > 0 do
       true ->
-        Enum.map(link_units, fn {_p, u} ->
-          delete(project, u)
-        end)
-
         {:error, errors}
 
       false ->
@@ -220,24 +216,48 @@ defmodule Arke.QueryManager do
 
   defp execute_write(%Hook{arke: arke} = hook, persist, old_data) do
     result =
-      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)),
-           {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
-           {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
-           {:ok, unit} <- handle_link_parameters_unit(arke, hook.unit),
-           {:ok, unit} <- persist.(unit),
-           {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, arke_sources(arke)),
-           {:ok, unit} <- handle_link_parameters(hook.unit, old_data),
-           {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
-           do: {:ok, hook}
+      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)) do
+        in_transaction(arke, fn ->
+          with {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
+               {:ok, unit} <- handle_link_parameters_unit(arke, hook.unit),
+               {:ok, unit} <- persist.(unit),
+               {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, arke_sources(arke)),
+               {:ok, unit} <- handle_link_parameters(hook.unit, old_data),
+               {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
+               do: {:ok, hook}
+        end)
+      end
 
+    finish_write(result, hook, arke, fn final -> {:ok, final.unit} end)
+  end
+
+  defp finish_write(result, hook, arke, on_success) do
     case result do
       {:ok, %Hook{} = final} ->
-        Pipeline.run_isolated(:after_commit, final, sources(arke))
-        {:ok, final.unit}
+        AfterCommit.enqueue(fn -> Pipeline.run_isolated(:after_commit, final, sources(arke)) end)
+        AfterCommit.flush()
+        on_success.(final)
 
       {:error, errors} ->
+        AfterCommit.drop()
         Pipeline.run_isolated(:after_rollback, %{hook | error: errors}, sources(arke))
         {:error, errors}
+    end
+  end
+
+  defp in_transaction(arke, fun) do
+    if Map.get(arke.metadata || %{}, :transaction, true) == false do
+      fun.()
+    else
+      transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
+      AfterCommit.begin()
+
+      try do
+        transaction_fn.(fun, [])
+      after
+        AfterCommit.finish()
+      end
     end
   end
 
@@ -318,23 +338,18 @@ defmodule Arke.QueryManager do
     hook = %Hook{op: :delete, arke: arke, project: project, unit: unit}
 
     result =
-      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)),
-           {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
-           {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
-           {:ok, nil} <- persistence_fn.(project, hook.unit),
-           {:ok, hook} <- Pipeline.run(:after_write, hook, group_sources(arke)),
-           {:ok, hook} <- Pipeline.run(:after_write, hook, arke_sources(arke)),
-           do: {:ok, hook}
+      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)) do
+        in_transaction(arke, fn ->
+          with {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
+               {:ok, nil} <- persistence_fn.(project, hook.unit),
+               {:ok, hook} <- Pipeline.run(:after_write, hook, group_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:after_write, hook, arke_sources(arke)),
+               do: {:ok, hook}
+        end)
+      end
 
-    case result do
-      {:ok, %Hook{} = final} ->
-        Pipeline.run_isolated(:after_commit, final, sources(arke))
-        {:ok, nil}
-
-      {:error, errors} ->
-        Pipeline.run_isolated(:after_rollback, %{hook | error: errors}, sources(arke))
-        {:error, errors}
-    end
+    finish_write(result, hook, arke, fn _final -> {:ok, nil} end)
   end
 
   @doc """

@@ -20,6 +20,7 @@ defmodule Arke.Test.HookArke do
   before_write :fail_when_flagged, on: [:create, :update]
   before_write :stamp_when_flagged, on: :create
   after_write :notify_after_write
+  after_write :fail_after_write_when_flagged, on: :create
   after_commit :fail_loudly_when_flagged
   after_commit :notify_after_commit
   after_rollback :notify_after_rollback
@@ -47,6 +48,13 @@ defmodule Arke.Test.HookArke do
   defp fail_when_flagged(%Hook{unit: unit} = hook) do
     case Unit.get_value(unit, :hook_flag) do
       "fail_before_write" -> {:error, [%{context: "hook_test", message: "failed on purpose"}]}
+      _ -> {:ok, hook}
+    end
+  end
+
+  defp fail_after_write_when_flagged(%Hook{unit: unit} = hook) do
+    case Unit.get_value(unit, :hook_flag) do
+      "fail_after_write" -> {:error, [%{context: "hook_test", message: "failed after write"}]}
       _ -> {:ok, hook}
     end
   end

@@ -24,7 +24,7 @@ defmodule Arke.Core.Project do
 
   @persistence Application.compile_env(:arke, :persistence)
 
-  arke id: :arke_project do
+  arke id: :arke_project, metadata: %{transaction: false} do
   end
 
   after_write :create_schema, on: :create

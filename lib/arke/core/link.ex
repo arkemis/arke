@@ -22,7 +22,7 @@ defmodule Arke.Core.Link do
   arke id: :arke_link do
   end
 
-  after_write :sync_managers
+  after_commit :sync_managers
 
   defp sync_managers(%Hook{unit: unit} = hook) do
     sync(hook.op, unit)

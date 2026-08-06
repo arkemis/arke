@@ -25,7 +25,17 @@ defmodule Arke.Core.Group do
   arke do
   end
 
-  after_write :sync_manager
+  after_write :normalize_arke_list, on: :update
+  after_commit :sync_manager
+
+  defp normalize_arke_list(%Hook{unit: %{data: data} = unit} = hook) do
+    arke_list =
+      Enum.reduce(data.arke_list, [], fn a, new_arke_list ->
+        [handle_link_init(a, :arke_list) | new_arke_list]
+      end)
+
+    {:ok, %{hook | unit: Unit.update(unit, %{arke_list: arke_list})}}
+  end
 
   defp sync_manager(%Hook{op: :create, unit: unit} = hook) do
     group = Unit.update(unit, arke_list: [])
@@ -33,18 +43,9 @@ defmodule Arke.Core.Group do
     {:ok, hook}
   end
 
-  defp sync_manager(%Hook{
-         op: :update,
-         unit: %{id: id, metadata: %{project: project}, data: data} = unit
-       } = hook) do
-    arke_list =
-      Enum.reduce(data.arke_list, [], fn a, new_arke_list ->
-        [handle_link_init(a, :arke_list) | new_arke_list]
-      end)
-
-    unit = Unit.update(unit, %{arke_list: arke_list})
+  defp sync_manager(%Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook) do
     GroupManager.update(id, project, unit)
-    {:ok, %{hook | unit: unit}}
+    {:ok, hook}
   end
 
   defp sync_manager(%Hook{op: :delete, unit: unit} = hook) do

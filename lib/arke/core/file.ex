@@ -28,12 +28,18 @@ defmodule Arke.Core.File do
   arke id: :arke_file do
   end
 
-  before_write :upload, on: :create
+  before_transaction :upload, on: :create
+  after_rollback :remove_uploaded, on: :create
   before_write :delete_stored_file, on: :delete
-  after_write :evict_cache, on: :delete
+  after_commit :evict_cache, on: :delete
 
   defp evict_cache(%Hook{unit: %{id: id, metadata: %{project: project}}} = hook) do
     FileManager.remove(id, project)
+    {:ok, hook}
+  end
+
+  defp remove_uploaded(%Hook{unit: %{data: %{name: name, path: path}}} = hook) do
+    file_storage_module().delete_file("#{path}/#{name}")
     {:ok, hook}
   end
 
