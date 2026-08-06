@@ -24,29 +24,36 @@ defmodule Arke.Hook.Compiler do
 
   It also implements the deprecation shim: old-style callback heads
   (`before_create/2`, `on_update/3`, `before_unit_create/2`, ...) are detected
-  and auto-registered as pipeline entries — `before_*` into `before_write`,
-  `on_*` into `after_write` — preserving their ordering and their ability to
-  abort the write. One warning per module points at the migration.
+  and auto-registered as pipeline entries that run OUTSIDE the transaction,
+  keeping the autocommit-era semantics they were written against — `before_*`
+  in the pre-transaction stage, `on_*` after the commit. Ordering and error
+  propagation are preserved; only migrated hooks join the transaction. One
+  warning per module points at the migration.
   """
 
   @ops [:create, :update, :delete]
 
+  # Legacy hooks keep autocommit-era semantics, so they run OUTSIDE the
+  # transaction: `before_*` in the pre-txn stage (same position, mutations
+  # still reach the persist), `on_*` after the commit (the row is committed
+  # and visible, as the hook was written to assume; an error is returned to
+  # the caller but no longer rolls anything back — exactly the old contract).
   @arke_legacy [
-    {:before_create, 2, :before_write, :create},
-    {:before_update, 3, :before_write, :update},
-    {:before_delete, 2, :before_write, :delete},
-    {:on_create, 2, :after_write, :create},
-    {:on_update, 3, :after_write, :update},
-    {:on_delete, 2, :after_write, :delete}
+    {:before_create, 2, :before_transaction, :create},
+    {:before_update, 3, :before_transaction, :update},
+    {:before_delete, 2, :before_transaction, :delete},
+    {:on_create, 2, :legacy_after, :create},
+    {:on_update, 3, :legacy_after, :update},
+    {:on_delete, 2, :legacy_after, :delete}
   ]
 
   @group_legacy [
-    {:before_unit_create, 2, :before_write, :create},
-    {:before_unit_update, 2, :before_write, :update},
-    {:before_unit_delete, 2, :before_write, :delete},
-    {:on_unit_create, 2, :after_write, :create},
-    {:on_unit_update, 2, :after_write, :update},
-    {:on_unit_delete, 2, :after_write, :delete}
+    {:before_unit_create, 2, :before_transaction, :create},
+    {:before_unit_update, 2, :before_transaction, :update},
+    {:before_unit_delete, 2, :before_transaction, :delete},
+    {:on_unit_create, 2, :legacy_after, :create},
+    {:on_unit_update, 2, :legacy_after, :update},
+    {:on_unit_delete, 2, :legacy_after, :delete}
   ]
 
   # {old_name, new_name, arity, default_body_kind} — the new heads are only
@@ -217,7 +224,8 @@ defmodule Arke.Hook.Compiler do
       IO.warn(
         """
         #{inspect(env.module)} defines legacy arke hooks: #{Enum.join(heads ++ dead, ", ")}.
-        DB writes: rename to before_write/after_write (arity-1 handlers over %Arke.Hook{}).
+        Legacy hooks run OUTSIDE the transaction (autocommit semantics preserved).
+        DB writes: rename to before_write/after_write (arity-1 handlers over %Arke.Hook{}) to join the transaction.
         External effects (email, HTTP, Tasks, caches): move to after_commit or before_transaction.
         """,
         Macro.Env.stacktrace(env)

@@ -135,7 +135,11 @@ defmodule Arke.Test.LegacyHookArke do
 
   def on_create(_arke, unit) do
     send(self(), {:legacy, :on_create})
-    {:ok, unit}
+
+    case Arke.Core.Unit.get_value(unit, :hook_flag) do
+      "fail_on_create" -> {:error, [%{context: "legacy_test", message: "on_create failed"}]}
+      _ -> {:ok, unit}
+    end
   end
 
   def before_update(_arke, old_unit, unit) do

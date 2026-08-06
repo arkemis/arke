@@ -118,6 +118,16 @@ defmodule Arke.HookPipelineTest do
              ]
     end
 
+    test "a legacy on_create error is returned but the committed row stays (autocommit contract)" do
+      assert {:error, [%{message: "on_create failed"}]} =
+               QueryManager.create(@project, legacy_arke(),
+                 id: "legacy_on_fail",
+                 hook_flag: "fail_on_create"
+               )
+
+      assert QueryManager.get_by(project: @project, id: "legacy_on_fail") != nil
+    end
+
     test "a legacy before_create can still abort the write" do
       assert {:error, [%{context: "legacy_test"}]} =
                QueryManager.create(@project, legacy_arke(),
