@@ -102,7 +102,7 @@ defmodule Arke.StructManager do
 
     data = get_raw_data(new_unit) |> get_parsed_data(arke, opts) |> Map.merge(base_data)
 
-    {:ok, data} = ArkeManager.call_func(arke, :on_struct_encode, [arke, new_unit, data, opts])
+    {:ok, data} = ArkeManager.call_func(arke, :after_struct_encode, [arke, new_unit, data, opts])
 
     # TODO figure out why in link units project key in metadata is a string
     Map.put(data, :metadata, Map.drop(data.metadata, [:project, "project"]))
