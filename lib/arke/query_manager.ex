@@ -43,7 +43,7 @@ defmodule Arke.QueryManager do
   alias Arke.Validator
   alias Arke.LinkManager
   alias Arke.Hook
-  alias Arke.Hook.{AfterCommit, Pipeline}
+  alias Arke.Hook.{Deferred, Pipeline}
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
   alias Arke.Errors.ArkeError
   alias Arke.Utils.ErrorGenerator, as: Error
@@ -151,27 +151,19 @@ defmodule Arke.QueryManager do
   def transaction(_project, fun, opts) do
     transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
 
-    AfterCommit.begin()
+    Deferred.begin()
 
-    result =
-      try do
-        transaction_fn.(fun, opts)
-      rescue
-        e ->
-          AfterCommit.finish()
-          AfterCommit.drop()
-          reraise e, __STACKTRACE__
-      end
+    result = settle_on_abort(fn -> transaction_fn.(fun, opts) end)
 
-    AfterCommit.finish()
+    Deferred.finish()
 
     case result do
-      {:error, _} = error ->
-        AfterCommit.drop()
+      {:error, errors} = error ->
+        Deferred.rollback(errors)
         error
 
       other ->
-        AfterCommit.flush()
+        Deferred.commit()
         other
     end
   end
@@ -296,8 +288,15 @@ defmodule Arke.QueryManager do
             _ -> final
           end
 
-        AfterCommit.enqueue(fn -> Pipeline.run_isolated(:after_commit, final, sources(arke)) end)
-        AfterCommit.flush()
+        Deferred.on_commit(fn -> Pipeline.run_isolated(:after_commit, final, sources(arke)) end)
+
+        # This write is durable but an enclosing transaction can still abort
+        # it, and only that outer frame knows: queue the compensator too.
+        Deferred.on_rollback(fn error ->
+          Pipeline.run_isolated(:after_rollback, %{final | error: error}, sources(arke))
+        end)
+
+        Deferred.commit()
 
         case legacy do
           {:ok, final} -> on_success.(final)
@@ -305,8 +304,8 @@ defmodule Arke.QueryManager do
         end
 
       {:error, errors} ->
-        AfterCommit.drop()
         Pipeline.run_isolated(:after_rollback, %{hook | error: errors}, sources(arke))
+        Deferred.rollback(errors)
         {:error, errors}
     end
   end
@@ -319,14 +318,24 @@ defmodule Arke.QueryManager do
       fun.()
     else
       transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
-      AfterCommit.begin()
+      Deferred.begin()
 
-      try do
-        transaction_fn.(fun, [])
-      after
-        AfterCommit.finish()
-      end
+      result = settle_on_abort(fn -> transaction_fn.(fun, []) end)
+
+      Deferred.finish()
+      result
     end
+  end
+
+  # A raise/throw/exit skips `finish_write`, so the queues would outlive the
+  # transaction that filled them and fire against the next successful write.
+  defp settle_on_abort(fun) do
+    fun.()
+  catch
+    kind, reason ->
+      Deferred.finish()
+      Deferred.rollback(reason)
+      :erlang.raise(kind, reason, __STACKTRACE__)
   end
 
   defp sources(arke), do: arke_sources(arke) ++ group_sources(arke)
@@ -453,7 +462,7 @@ defmodule Arke.QueryManager do
     {distinct, opts} = Keyword.pop(opts, :distinct, nil)
     {lock, opts} = Keyword.pop(opts, :lock, false)
 
-    if lock and AfterCommit.depth() == 0,
+    if lock and Deferred.depth() == 0,
       do: raise(ArgumentError, "lock: is only valid inside a transaction")
 
     arke = get_arke(arke, project)

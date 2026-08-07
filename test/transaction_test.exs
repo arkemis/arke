@@ -122,6 +122,31 @@ defmodule Arke.TransactionTest do
 
       refute {:hook, :after_commit, :create} in drain()
     end
+
+    test "a rolled-back transaction compensates the writes that already succeeded" do
+      {:error, :nope} =
+        QueryManager.transaction(@project, fn ->
+          {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_compensated")
+          {:error, :nope}
+        end)
+
+      assert {:hook, :after_rollback, :create, :nope} in drain()
+    end
+
+    test "a raise inside the transaction compensates and leaves no queue behind" do
+      assert_raise RuntimeError, "boom", fn ->
+        QueryManager.transaction(@project, fn ->
+          {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_raised")
+          raise "boom"
+        end)
+      end
+
+      assert Enum.any?(drain(), &match?({:hook, :after_rollback, :create, _}, &1))
+
+      {:ok, _} = QueryManager.create(@project, hook_arke(), id: "txn_after_raise")
+
+      assert Enum.count(drain(), &match?({:hook, :after_commit, :create}, &1)) == 1
+    end
   end
 
   describe "lock:" do
