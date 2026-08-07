@@ -14,8 +14,9 @@
   `ParameterManager`; the per-Arke `metadata` overrides are merged over the
   global definition at lookup time — that is how one `:label` parameter can
   be `required: true` on one Arke and optional on another.
-- **Group**: a tag over Arkes with an `arke_list`; its `*_unit_*` hooks fire
-  for every Unit of every member Arke.
+- **Group**: a tag over Arkes with an `arke_list`; its hooks (same DSL slots
+  as arkes, plus the legacy `*_unit_*` heads via the shim) fire for every
+  Unit of every member Arke.
 - **Link**: a Unit with `arke_id: :arke_link` (`parent_id`, `child_id`,
   `type`, `metadata`). Two link types are magic and maintain ETS state:
   `type: "parameter"` (attaches a Parameter to an Arke) and `type: "group"`
