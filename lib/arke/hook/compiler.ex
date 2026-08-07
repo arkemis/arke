@@ -223,13 +223,16 @@ defmodule Arke.Hook.Compiler do
          do: ["before_update/2 was never invoked by the old pipeline and is NOT shimmed"],
          else: []
 
-    if heads != [] or dead != [] do
+    warn? = Module.get_attribute(env.module, :arke_legacy_warning) != false
+
+    if warn? and (heads != [] or dead != []) do
       IO.warn(
         """
         #{inspect(env.module)} defines legacy arke hooks: #{Enum.join(heads ++ dead, ", ")}.
         Legacy hooks run OUTSIDE the transaction (autocommit semantics preserved).
         DB writes: rename to before_write/after_write (arity-1 handlers over %Arke.Hook{}) to join the transaction.
         External effects (email, HTTP, Tasks, caches): move to after_commit or before_transaction.
+        Set `@arke_legacy_warning false` to silence this warning while migrating.
         """,
         Macro.Env.stacktrace(env)
       )

@@ -20,6 +20,7 @@ defmodule Arke.System.Group do
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)
       Module.register_attribute(__MODULE__, :system_group, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :arke_hooks, accumulate: true)
+      Module.register_attribute(__MODULE__, :arke_legacy_warning, accumulate: false)
       Module.put_attribute(__MODULE__, :system_group, true)
 
       import unquote(__MODULE__),

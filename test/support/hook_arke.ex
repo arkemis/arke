@@ -119,6 +119,8 @@ defmodule Arke.Test.LegacyHookArke do
   """
   use Arke.System
 
+  @arke_legacy_warning false
+
   arke id: :legacy_hook_arke do
     parameter(:hook_flag, :string, required: false)
   end
@@ -184,6 +186,8 @@ defmodule Arke.Test.LegacyHookGroup do
   the group shim. Bound to `legacy_hook_arke`.
   """
   use Arke.System.Group
+
+  @arke_legacy_warning false
 
   group id: :legacy_hook_group do
   end
