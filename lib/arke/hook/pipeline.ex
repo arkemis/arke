@@ -83,7 +83,6 @@ defmodule Arke.Hook.Pipeline do
   end
 
   defp invoke(module, {:local, name}, hook), do: module.__arke_hook_call__(name, hook)
-  defp invoke(module, {:legacy, name}, hook), do: module.__arke_legacy__(name, hook)
   defp invoke(_module, fun, hook) when is_function(fun, 1), do: fun.(hook)
 
   defp invalid_return(module, slot, other) do

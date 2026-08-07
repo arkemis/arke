@@ -25,11 +25,14 @@ defmodule Arke.Hook.DSL do
   functions for one-liners. Registration order is execution order; multiple
   hooks per slot are first-class. `on:` filters by operation
   (`:create` | `:update` | `:delete`); without it the hook runs on every op.
+
+  At `@before_compile` the accumulated registrations become
+  `__arke_hooks__/0` (the ordered entry list `Arke.Hook.Pipeline` reads) and
+  `__arke_hook_call__/2` (the dispatcher that reaches private handlers).
   """
 
   @slots [:before_transaction, :before_write, :after_write, :after_commit, :after_rollback]
-
-  def slots(), do: @slots
+  @ops [:create, :update, :delete]
 
   for slot <- @slots do
     defmacro unquote(slot)(handler, opts \\ []) do
@@ -42,6 +45,58 @@ defmodule Arke.Hook.DSL do
 
     quote do
       @arke_hooks {unquote(slot), unquote(handler_ast), unquote(opts)}
+    end
+  end
+
+  defmacro __before_compile__(env) do
+    hooks =
+      env.module
+      |> Module.get_attribute(:arke_hooks)
+      |> Enum.reverse()
+      |> Enum.map(fn {slot, handler, opts} -> {slot, handler, normalize_on(env, opts)} end)
+
+    entries =
+      Enum.map(hooks, fn {slot, handler, on} ->
+        handler_repr =
+          if is_atom(handler),
+            do: quote(do: {:local, unquote(handler)}),
+            else: handler
+
+        quote do
+          %{slot: unquote(slot), on: unquote(on), handler: unquote(handler_repr)}
+        end
+      end)
+
+    dispatchers =
+      for name <- hooks |> Enum.map(&elem(&1, 1)) |> Enum.filter(&is_atom/1) |> Enum.uniq() do
+        quote do
+          def __arke_hook_call__(unquote(name), hook), do: unquote(name)(hook)
+        end
+      end
+
+    quote do
+      def __arke_hooks__(), do: unquote(entries)
+      unquote_splicing(dispatchers)
+    end
+  end
+
+  defp normalize_on(_env, []), do: nil
+
+  defp normalize_on(env, opts) do
+    case Keyword.fetch(opts, :on) do
+      :error ->
+        nil
+
+      {:ok, on} ->
+        on = List.wrap(on)
+
+        case Enum.reject(on, &(&1 in @ops)) do
+          [] ->
+            on
+
+          bad ->
+            raise CompileError, description: "invalid hook op #{inspect(bad)}", file: env.file
+        end
     end
   end
 end

@@ -42,7 +42,7 @@
 - Cluster replication of manager writes is best-effort: no rollback, no
   ordering guarantee, late-joining nodes stay stale until reseeded/rebooted.
 - Version notes: 0.9.0 introduced the transactional write pipeline, the hook
-  DSL and `QueryManager.transaction/3` (legacy hook names run outside the
-  transaction via a shim); `update_key/2` and nested logic operators require
-  ≥ 0.6.0; 0.5.0 moved file caching to `Arke.Boundary.FileManager`
-  (breaking).
+  DSL and `QueryManager.transaction/3`, and REMOVED the pre-0.9
+  `before_*`/`on_*` callback heads (breaking); `update_key/2` and nested
+  logic operators require ≥ 0.6.0; 0.5.0 moved file caching to
+  `Arke.Boundary.FileManager` (breaking).

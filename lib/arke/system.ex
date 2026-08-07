@@ -20,7 +20,6 @@ defmodule Arke.System do
       Module.register_attribute(__MODULE__, :groups, accumulate: true, persist: true)
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)
       Module.register_attribute(__MODULE__, :arke_hooks, accumulate: true)
-      Module.register_attribute(__MODULE__, :arke_legacy_warning, accumulate: false)
 
       Module.put_attribute(__MODULE__, :system_arke, true)
 
@@ -29,7 +28,7 @@ defmodule Arke.System do
 
       import Arke.Hook.DSL
 
-      @before_compile {Arke.Hook.Compiler, :__before_compile_arke__}
+      @before_compile Arke.Hook.DSL
 
       def arke_from_attr(),
         do: Keyword.get(__MODULE__.__info__(:attributes), :arke, []) |> List.first()
@@ -42,8 +41,11 @@ defmodule Arke.System do
       end
 
       def before_load(data, _persistence_fn), do: {:ok, data}
+      def after_load(unit, _persistence_fn), do: {:ok, unit}
       def before_validate(arke, unit), do: {:ok, unit}
+      def after_validate(arke, unit), do: {:ok, unit}
       def before_struct_encode(_, unit), do: {:ok, unit}
+      def after_struct_encode(_, _, data, opts), do: {:ok, data}
 
       def after_get_struct(arke, unit, struct), do: struct
       def after_get_struct(arke, struct), do: struct
@@ -210,8 +212,11 @@ defmodule Arke.System do
         do: {existing_units, units_args, error_units}
 
       defoverridable before_load: 2,
+                     after_load: 2,
                      before_validate: 2,
+                     after_validate: 2,
                      before_struct_encode: 2,
+                     after_struct_encode: 4,
                      after_get_struct: 2,
                      after_get_struct: 3,
 

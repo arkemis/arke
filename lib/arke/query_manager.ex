@@ -279,17 +279,6 @@ defmodule Arke.QueryManager do
   defp finish_write(result, hook, arke, on_success) do
     case result do
       {:ok, %Hook{} = final} ->
-        # Legacy on_* hooks run here, after the commit: the write is already
-        # durable, so their error is returned to the caller but rolls nothing
-        # back — the autocommit-era contract they were written against.
-        legacy = Pipeline.run(:legacy_after, final, legacy_after_sources(arke, final.op))
-
-        final =
-          case legacy do
-            {:ok, mutated} -> mutated
-            _ -> final
-          end
-
         Deferred.on_commit(fn -> Pipeline.run_isolated(:after_commit, final, sources(arke)) end)
 
         # This write is durable but an enclosing transaction can still abort
@@ -299,11 +288,7 @@ defmodule Arke.QueryManager do
         end)
 
         Deferred.commit()
-
-        case legacy do
-          {:ok, final} -> on_success.(final)
-          {:error, errors} -> {:error, errors}
-        end
+        on_success.(final)
 
       {:error, errors} ->
         Pipeline.run_isolated(:after_rollback, %{hook | error: errors}, sources(arke))
@@ -311,9 +296,6 @@ defmodule Arke.QueryManager do
         {:error, errors}
     end
   end
-
-  defp legacy_after_sources(arke, :delete), do: group_sources(arke) ++ arke_sources(arke)
-  defp legacy_after_sources(arke, _op), do: arke_sources(arke) ++ group_sources(arke)
 
   defp in_transaction(arke, fun) do
     if Map.get(arke.metadata || %{}, :transaction, true) == false do

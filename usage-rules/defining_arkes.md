@@ -63,14 +63,14 @@
   `after_load/2`, `before_validate/2`, `after_validate/2`,
   `before_struct_encode/2`, `after_struct_encode/4`, `after_get_struct/2`.
   They return `{:ok, value}` or `{:error, errors}`.
-- Legacy callbacks (`before_create/2`, `on_create/2`, `before_update/3`,
-  `on_update/3`, `before_delete/2`, `on_delete/2` and the group
-  `before_unit_*`/`on_unit_*` heads) still work through a compile-time shim
-  but run OUTSIDE the transaction with their historical autocommit semantics:
-  an `on_*` error is returned to the caller yet rolls nothing back. Migrate
-  `before_*` to `before_write`, `on_*` to `after_write` (or `after_commit`
-  for effects) to join the transaction. Silence the per-module deprecation
-  warning during migration with `@arke_legacy_warning false`.
+- The pre-0.9 callback heads are REMOVED (`before_create/2`, `on_create/2`,
+  `before_update/3`, `on_update/3`, `before_delete/2`, `on_delete/2`, the
+  group `before_unit_*`/`on_unit_*` heads, and the `on_load/2`,
+  `on_validate/2`, `on_struct_encode/4` names): defining them still compiles
+  but NOTHING calls them. Migrate `before_*` to `before_write` (or
+  `before_transaction` for external calls), `on_*` to `after_write` (or
+  `after_commit` for effects), and the read-path heads to their `after_*`
+  names.
 - Do not spawn Tasks that read the written row from inside the transaction
   (`before_write`/`after_write`): the row is not visible to other processes
   until commit — use `after_commit`.
