@@ -170,6 +170,99 @@ defmodule Arke.Core.UnitTest do
     end
   end
 
+  # Every value coming in from an import or a CSV is a string. `parse_value/2`
+  # is private, so it is exercised through `Unit.load/2`, its entry point.
+  describe "Unit string coercion" do
+    defp support(opts), do: Unit.load(ArkeManager.get(:arke_test_support, :arke_system), opts)
+
+    test "reads \"null\" and \"undefined\" as nil" do
+      assert support(string_support: "null").data.string_support == nil
+      assert support(string_support: "undefined").data.string_support == nil
+      assert support(integer_support: "null").data.integer_support == nil
+    end
+
+    test "reads the truthy spellings of a boolean" do
+      for value <- ["true", "TRUE", "1", true] do
+        assert support(boolean_support: value).data.boolean_support == true
+      end
+    end
+
+    test "reads the falsy spellings of a boolean" do
+      for value <- ["false", "FALSE", "0", false] do
+        assert support(boolean_support: value).data.boolean_support == false
+      end
+    end
+
+    test "leaves an unrecognised boolean spelling alone for the validator to reject" do
+      assert support(boolean_support: "maybe").data.boolean_support == "maybe"
+    end
+
+    test "parses an integer" do
+      assert support(integer_support: "42").data.integer_support == 42
+      assert support(integer_support: "-7").data.integer_support == -7
+      assert support(integer_support: "3 apples").data.integer_support == 3
+    end
+
+    test "reports an unparseable integer" do
+      assert support(integer_support: "apples").data.integer_support ==
+               [%{context: "validation", message: "invalid integer"}]
+    end
+
+    test "parses a float" do
+      assert support(float_support: "2.5").data.float_support == 2.5
+      assert support(float_support: "-0.75").data.float_support == -0.75
+      assert support(float_support: "1.5kg").data.float_support == 1.5
+    end
+
+    test "reports an unparseable float" do
+      assert support(float_support: "kg").data.float_support ==
+               [%{context: "validation", message: "invalid float"}]
+    end
+
+    test "splits a bracketed string into a list for a multiple parameter" do
+      group_model = ArkeManager.get(:group, :arke_system)
+
+      # arke_list is a multiple link parameter
+      assert Unit.load(group_model, arke_list: "[first,second]").data.arke_list ==
+               ["first", "second"]
+
+      assert Unit.load(group_model, arke_list: "['first','second']").data.arke_list ==
+               ["first", "second"]
+
+      # quotes are only stripped when they are flush against the comma, so a
+      # space keeps them. Pinned, not endorsed.
+      assert Unit.load(group_model, arke_list: "['first', 'second']").data.arke_list ==
+               ["first", " 'second"]
+
+      assert Unit.load(group_model, arke_list: "single").data.arke_list == ["single"]
+      assert Unit.load(group_model, arke_list: "[]").data.arke_list == []
+    end
+
+    test "leaves a value of the right type untouched" do
+      assert support(integer_support: 42).data.integer_support == 42
+      assert support(float_support: 2.5).data.float_support == 2.5
+      assert support(dict_support: %{a: 1}).data.dict_support == %{a: 1}
+    end
+  end
+
+  describe "Unit.encode_unit_data/2" do
+    test "drops parameters flagged only_runtime" do
+      arke = ArkeManager.get(:arke_file, :arke_system)
+
+      encoded = Unit.encode_unit_data(arke, %{name: "photo.png", binary_data: <<1, 2, 3>>})
+
+      assert Map.keys(encoded) == ["name"]
+    end
+
+    test "drops keys that are not parameters of the arke" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+
+      encoded = Unit.encode_unit_data(arke, %{string_support: "a", not_a_parameter: "b"})
+
+      assert Map.keys(encoded) == ["string_support"]
+    end
+  end
+
   describe "Unit.encode_unit_data/2 timestamp" do
     test "stamps each encoded parameter with a second-precision UTC datetime" do
       arke = ArkeManager.get(:arke_test_support, :arke_system)

@@ -127,4 +127,65 @@ defmodule Arke.Boundary.GroupManagerTest do
       assert name_parameter.data.format == "attribute"
     end
   end
+
+  describe "GroupManager error paths" do
+    setup do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      arke_data = [id: :test_arke_group, label: "Arke test"]
+      arke_unit = ArkeManager.create(Unit.load(arke_model, arke_data), :test_schema)
+
+      group_model = ArkeManager.get(:group, :arke_system)
+      group_data = [id: "group_test", label: "group_test"]
+      group_unit = GroupManager.create(Unit.load(group_model, group_data), :test_schema)
+
+      LinkManager.add_node(:test_schema, group_unit, arke_unit, "group")
+
+      {:ok, arke: arke_unit, group: GroupManager.get(:group_test, :test_schema)}
+    end
+
+    test "get_arke_list/1 on something that is not a unit" do
+      assert GroupManager.get_arke_list(%{}) ==
+               {:error, [%{context: "group", message: "invalid unit"}]}
+    end
+
+    test "get_arke_list/1 on an arke that is no longer registered", %{group: group} do
+      ArkeManager.remove(:test_arke_group, :test_schema)
+
+      # the skip branch keys off {:error, msg}, but ArkeManager.get/2 returns
+      # nil for an unknown id. Pinned, not endorsed.
+      assert_raise FunctionClauseError, fn -> GroupManager.get_arke_list(group) end
+    end
+
+    test "get_arke/3 finds a linked arke", %{group: group} do
+      assert GroupManager.get_arke(group, :test_arke_group).id == :test_arke_group
+
+      assert GroupManager.get_arke(:group_test, :test_schema, "test_arke_group").id ==
+               :test_arke_group
+    end
+
+    test "get_arke/3 on an arke that is not in the group", %{group: group} do
+      assert GroupManager.get_arke(group, :arke) == nil
+    end
+
+    test "get_arke/3 on an unknown group" do
+      # same nil-instead-of-{:error, msg} mismatch: get/2 returns nil, which
+      # get_arke_list/1 answers with an error tuple that Enum.find cannot walk
+      assert_raise Protocol.UndefinedError, fn ->
+        GroupManager.get_arke(:not_a_group, :test_schema, :arke)
+      end
+    end
+
+    test "get_arke/3 passes a unit through", %{arke: arke} do
+      assert GroupManager.get_arke(:not_a_group, :test_schema, arke) == arke
+    end
+
+    test "remove/2 on an unknown group" do
+      assert GroupManager.remove(:not_a_group, :test_schema) ==
+               {:error, "not_a_group doesn't exist in project: test_schema"}
+    end
+
+    test "get/2 on a nil id" do
+      assert GroupManager.get(nil, :test_schema) == nil
+    end
+  end
 end
