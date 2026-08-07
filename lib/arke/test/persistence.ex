@@ -60,6 +60,15 @@ defmodule Arke.Test.Persistence do
   end
 
   @doc """
+  Stands in for the repo's `start_link/0`, which `mix arke.seed_project` calls.
+
+  There is no process to start — `setup/0` owns the table — so this reports the
+  failure the task already handles by seeding without a repo.
+  """
+  @spec start_link() :: {:error, :no_repo_process}
+  def start_link, do: {:error, :no_repo_process}
+
+  @doc """
   Drops every stored unit.
   """
   @spec reset() :: :ok
