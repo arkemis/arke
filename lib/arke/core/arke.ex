@@ -25,8 +25,8 @@ defmodule Arke.Core.Arke do
   arke id: :arke do
   end
 
-  after_write :ensure_base_parameters, on: :create
-  after_commit :sync_manager
+  after_write(:ensure_base_parameters, on: :create)
+  after_commit(:sync_manager)
 
   defp ensure_base_parameters(%Hook{arke: arke, unit: unit} = hook),
     do: {:ok, %{hook | unit: check_base_parameters(arke, unit)}}
@@ -36,7 +36,9 @@ defmodule Arke.Core.Arke do
     {:ok, hook}
   end
 
-  defp sync_manager(%Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook) do
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     ArkeManager.update(id, project, unit)
     {:ok, hook}
   end

@@ -11,19 +11,19 @@ defmodule Arke.Test.HookArke do
     parameter(:hook_flag, :string, required: false)
   end
 
-  before_transaction fn hook ->
+  before_transaction(fn hook ->
     send(self(), {:hook, :before_transaction, hook.op})
     {:ok, hook}
-  end
+  end)
 
-  before_write :notify_before_write
-  before_write :fail_when_flagged, on: [:create, :update]
-  before_write :stamp_when_flagged, on: :create
-  after_write :notify_after_write
-  after_write :fail_after_write_when_flagged, on: :create
-  after_commit :fail_loudly_when_flagged
-  after_commit :notify_after_commit
-  after_rollback :notify_after_rollback
+  before_write(:notify_before_write)
+  before_write(:fail_when_flagged, on: [:create, :update])
+  before_write(:stamp_when_flagged, on: :create)
+  after_write(:notify_after_write)
+  after_write(:fail_after_write_when_flagged, on: :create)
+  after_commit(:fail_loudly_when_flagged)
+  after_commit(:notify_after_commit)
+  after_rollback(:notify_after_rollback)
 
   defp notify_before_write(hook) do
     send(self(), {:hook, :before_write, hook.op})

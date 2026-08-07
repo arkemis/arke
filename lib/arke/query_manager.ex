@@ -264,9 +264,11 @@ defmodule Arke.QueryManager do
                {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
                {:ok, unit} <- handle_link_parameters_unit(arke, hook.unit),
                {:ok, unit} <- persist.(unit),
-               {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, arke_sources(arke)),
+               {:ok, hook} <-
+                 Pipeline.run(:after_write, %{hook | unit: unit}, arke_sources(arke)),
                {:ok, unit} <- handle_link_parameters(hook.unit, old_data),
-               {:ok, hook} <- Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
+               {:ok, hook} <-
+                 Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
                do: {:ok, hook}
         end)
       end

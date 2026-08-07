@@ -27,8 +27,8 @@ defmodule Arke.Core.Project do
   arke id: :arke_project, metadata: %{transaction: false} do
   end
 
-  after_write :create_schema, on: :create
-  after_write :drop_schema, on: :delete
+  after_write(:create_schema, on: :create)
+  after_write(:drop_schema, on: :delete)
 
   defp create_schema(%Hook{unit: unit} = hook) do
     persistence_fn = @persistence[:arke_postgres][:create_project]

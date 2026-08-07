@@ -127,8 +127,11 @@ defmodule Arke.Hook.Compiler do
         on = List.wrap(on)
 
         case Enum.reject(on, &(&1 in @ops)) do
-          [] -> on
-          bad -> raise CompileError, description: "invalid hook op #{inspect(bad)}", file: env.file
+          [] ->
+            on
+
+          bad ->
+            raise CompileError, description: "invalid hook op #{inspect(bad)}", file: env.file
         end
     end
   end

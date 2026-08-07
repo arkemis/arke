@@ -25,8 +25,8 @@ defmodule Arke.Core.Group do
   arke do
   end
 
-  after_write :normalize_arke_list, on: :update
-  after_commit :sync_manager
+  after_write(:normalize_arke_list, on: :update)
+  after_commit(:sync_manager)
 
   defp normalize_arke_list(%Hook{unit: %{data: data} = unit} = hook) do
     arke_list =
@@ -43,7 +43,9 @@ defmodule Arke.Core.Group do
     {:ok, hook}
   end
 
-  defp sync_manager(%Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook) do
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     GroupManager.update(id, project, unit)
     {:ok, hook}
   end

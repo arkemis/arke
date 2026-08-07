@@ -59,14 +59,16 @@ defmodule Arke.Core.Parameter do
   group id: "parameter" do
   end
 
-  after_commit :sync_manager
+  after_commit(:sync_manager)
 
   defp sync_manager(%Hook{op: :create, unit: unit} = hook) do
     ParameterManager.create(unit)
     {:ok, hook}
   end
 
-  defp sync_manager(%Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook) do
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     ParameterManager.update(id, project, unit)
     {:ok, hook}
   end

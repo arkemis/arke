@@ -61,7 +61,8 @@ defmodule Arke.HookPipelineTest do
     end
 
     test "mutating hook.unit in before_write is persisted" do
-      {:ok, unit} = QueryManager.create(@project, hook_arke(), id: "hook_stamp", hook_flag: "stamp")
+      {:ok, unit} =
+        QueryManager.create(@project, hook_arke(), id: "hook_stamp", hook_flag: "stamp")
 
       assert Unit.get_value(unit, :hook_flag) == "stamped"
 
