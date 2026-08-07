@@ -15,7 +15,6 @@
 defmodule Arke.System do
   defmacro __using__(_) do
     quote do
-      #      @after_compile __MODULE__
       Module.register_attribute(__MODULE__, :arke, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :groups, accumulate: true, persist: true)
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)

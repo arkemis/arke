@@ -15,7 +15,6 @@
 defmodule Arke.System.Group do
   defmacro __using__(_) do
     quote do
-      #      @after_compile __MODULE__
       Module.register_attribute(__MODULE__, :group, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)
       Module.register_attribute(__MODULE__, :system_group, accumulate: false, persist: true)
@@ -36,13 +35,6 @@ defmodule Arke.System.Group do
         do: Keyword.get(__MODULE__.__info__(:attributes), :system_group, []) |> List.first()
     end
   end
-
-  #  defmacro __before_compile__(env) do
-  #  end
-  #
-  #  def compile(translations) do
-  #
-  #  end
 
   ######################################################################################################################
   # Group MACRO #########################################################################################################
