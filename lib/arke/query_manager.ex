@@ -257,8 +257,8 @@ defmodule Arke.QueryManager do
     do: {:ok, parameter, value}
 
   defp execute_write(%Hook{arke: arke} = hook, persist, old_data) do
-    result =
-      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)) do
+    case Pipeline.run(:before_transaction, hook, sources(arke)) do
+      {:ok, hook} ->
         in_transaction(arke, fn ->
           with {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
                {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
@@ -271,9 +271,11 @@ defmodule Arke.QueryManager do
                  Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
                do: {:ok, hook}
         end)
-      end
+        |> finish_write(hook, arke, fn final -> {:ok, final.unit} end)
 
-    finish_write(result, hook, arke, fn final -> {:ok, final.unit} end)
+      {:error, _} = error ->
+        finish_write(error, hook, arke, fn final -> {:ok, final.unit} end)
+    end
   end
 
   defp finish_write(result, hook, arke, on_success) do
