@@ -995,6 +995,12 @@
           "required": true,
           "default_string": "postgres_schema"
         }
+      },
+      {
+        "id": "bucket",
+        "metadata": {
+          "required": false
+        }
       }
     ]
   }

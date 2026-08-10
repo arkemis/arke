@@ -44,6 +44,12 @@
       "metadata": {
         "required": false
       }
+    },
+    {
+      "id": "bucket",
+      "metadata": {
+        "required": false
+      }
     }
   ]
 }
