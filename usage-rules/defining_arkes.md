@@ -57,8 +57,10 @@
     home for effects (email, push, Tasks, cache sync). It cannot mutate the
     persisted row.
   - `after_rollback`: after rollback, failure only — compensation
-    (`hook.error` carries the reason). Both post-outcome slots are isolated:
-    a raising entry is logged and never changes the caller's result.
+    (`hook.error` carries the reason). `hook.unit` is the unit as
+    `before_transaction` left it, so a compensator can undo what that hook
+    staged. Both post-outcome slots are isolated: a raising entry is logged
+    and never changes the caller's result.
 - Read/build-path hooks stay overridable callback heads: `before_load/2`,
   `after_load/2`, `before_validate/2`, `after_validate/2`,
   `before_struct_encode/2`, `after_struct_encode/4`, `after_get_struct/2`.
