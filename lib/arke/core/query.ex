@@ -17,7 +17,7 @@ defmodule Arke.Core.Query do
     Struct which defines a Query
   """
 
-  defstruct ~w[project arke persistence distinct filters link orders offset limit]a
+  defstruct ~w[project arke persistence distinct filters link orders offset limit lock]a
   @type t() :: %Arke.Core.Query{}
 
   defmodule LinkFilter do
@@ -198,8 +198,16 @@ defmodule Arke.Core.Query do
       filters: [],
       orders: [],
       offset: nil,
-      limit: nil
+      limit: nil,
+      lock: false
     }
+
+  @doc """
+  Makes the query acquire a row lock (`SELECT ... FOR UPDATE`).
+  Only valid inside a transaction.
+  """
+  @spec set_lock(query :: Arke.Core.Query.t(), lock :: boolean()) :: Arke.Core.Query.t()
+  def set_lock(query, lock), do: %{query | lock: lock}
 
   @doc """
   Add a new link filter

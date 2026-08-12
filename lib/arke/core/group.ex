@@ -20,25 +20,39 @@ defmodule Arke.Core.Group do
   use Arke.System
   alias Arke.Boundary.GroupManager
   alias Arke.Core.Unit
+  alias Arke.Hook
 
   arke do
   end
 
-  def on_create(_arke, unit) do
-    group = Unit.update(unit, arke_list: [])
-    GroupManager.create(group)
-    {:ok, unit}
-  end
+  after_write(:normalize_arke_list, on: :update)
+  after_commit(:sync_manager)
 
-  def on_update(_, _old_unit, %{id: id, metadata: %{project: project}, data: data} = unit) do
+  defp normalize_arke_list(%Hook{unit: %{data: data} = unit} = hook) do
     arke_list =
       Enum.reduce(data.arke_list, [], fn a, new_arke_list ->
         [handle_link_init(a, :arke_list) | new_arke_list]
       end)
 
-    unit = Unit.update(unit, %{arke_list: arke_list})
+    {:ok, %{hook | unit: Unit.update(unit, %{arke_list: arke_list})}}
+  end
+
+  defp sync_manager(%Hook{op: :create, unit: unit} = hook) do
+    group = Unit.update(unit, arke_list: [])
+    GroupManager.create(group)
+    {:ok, hook}
+  end
+
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     GroupManager.update(id, project, unit)
-    {:ok, unit}
+    {:ok, hook}
+  end
+
+  defp sync_manager(%Hook{op: :delete, unit: unit} = hook) do
+    GroupManager.remove(unit)
+    {:ok, hook}
   end
 
   def handle_link_init(u, p) when is_binary(u),
@@ -48,9 +62,4 @@ defmodule Arke.Core.Group do
     do: %{id: u, metadata: %{"parameter_id" => Atom.to_string(p)}}
 
   def handle_link_init(u, _), do: u
-
-  def on_delete(_, unit) do
-    GroupManager.remove(unit)
-    {:ok, unit}
-  end
 end

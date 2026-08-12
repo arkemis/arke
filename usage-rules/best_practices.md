@@ -29,9 +29,20 @@
   # then: mix arke.seed_project --project client_acme
   ```
 
+- Put effects (email, push, HTTP, Tasks, cache sync) in `after_commit` ONLY —
+  from `before_write`/`after_write` the row is not committed yet and a later
+  rollback cannot un-send an email.
+- Protect read-modify-write money paths with `QueryManager.transaction/3`
+  plus `lock: true` on the read — a transaction alone does not close
+  lost-update races.
+- Register the `transaction:` key in the persistence map — without it writes
+  run on an identity seam with no rollback guarantees.
 - Unique + nil values are not checked (`unique: true` with a `nil` value
   passes validation) — enforce NOT NULL semantics with `required: true`.
 - Cluster replication of manager writes is best-effort: no rollback, no
   ordering guarantee, late-joining nodes stay stale until reseeded/rebooted.
-- Version notes: `update_key/2` and nested logic operators require ≥ 0.6.0;
-  0.5.0 moved file caching to `Arke.Boundary.FileManager` (breaking).
+- Version notes: 0.9.0 introduced the transactional write pipeline, the hook
+  DSL and `QueryManager.transaction/3`, and REMOVED the pre-0.9
+  `before_*`/`on_*` callback heads (breaking); `update_key/2` and nested
+  logic operators require ≥ 0.6.0; 0.5.0 moved file caching to
+  `Arke.Boundary.FileManager` (breaking).

@@ -19,13 +19,15 @@
   ```elixir
   defmodule MyApp.Person do
     use Arke.System
-    alias Arke.Core.Unit
+    alias Arke.{Core.Unit, Hook}
 
     arke id: :person do
     end
 
-    def before_create(_arke, unit),
-      do: {:ok, Unit.update(unit, email: String.downcase(unit.data.email))}
+    before_write :downcase_email, on: [:create, :update]
+
+    defp downcase_email(%Hook{unit: unit} = hook),
+      do: {:ok, %{hook | unit: Unit.update(unit, email: String.downcase(unit.data.email))}}
   end
   ```
 
@@ -40,11 +42,38 @@
   become live only when loaded from registry JSON (`mix arke.seed_project`)
   or from the DB at boot. A module without a matching registry/DB entry never
   fires its hooks.
-- Lifecycle hooks on the Arke module: `before_load/2`, `on_load/2`,
-  `before_validate/2`, `on_validate/2`, `before_create/2`, `on_create/2`,
-  `before_update/3`, `on_update/3`, `before_delete/2`, `on_delete/2`,
-  `before_struct_encode/2`, `on_struct_encode/4`, `after_get_struct/2`. All
-  return `{:ok, unit}` or `{:error, errors}`.
+- Write-path hooks are declared with the registration DSL
+  (`before_transaction`, `before_write`, `after_write`, `after_commit`,
+  `after_rollback`). Handlers are private arity-1 functions over
+  `%Arke.Hook{}` (fields: `op`, `arke`, `group`, `project`, `unit`,
+  `old_unit`, `error`) returning `{:ok, hook}` or `{:error, reason}`; the op
+  is `hook.op`, `on:` filters it, registration order is execution order:
+  - `before_transaction`: outside the txn, before any write — external calls
+    and slow work (bcrypt, HTTP, file staging); an error aborts everything.
+  - `before_write` / `after_write`: inside the txn, around the persist.
+    Mutate `hook.unit` in `before_write`; an error in either rolls the whole
+    write back.
+  - `after_commit`: after the OUTERMOST commit, success only — the only legal
+    home for effects (email, push, Tasks, cache sync). It cannot mutate the
+    persisted row.
+  - `after_rollback`: after rollback, failure only — compensation
+    (`hook.error` carries the reason). Both post-outcome slots are isolated:
+    a raising entry is logged and never changes the caller's result.
+- Read/build-path hooks stay overridable callback heads: `before_load/2`,
+  `after_load/2`, `before_validate/2`, `after_validate/2`,
+  `before_struct_encode/2`, `after_struct_encode/4`, `after_get_struct/2`.
+  They return `{:ok, value}` or `{:error, errors}`.
+- The pre-0.9 callback heads are REMOVED (`before_create/2`, `on_create/2`,
+  `before_update/3`, `on_update/3`, `before_delete/2`, `on_delete/2`, the
+  group `before_unit_*`/`on_unit_*` heads, and the `on_load/2`,
+  `on_validate/2`, `on_struct_encode/4` names): defining them still compiles
+  but NOTHING calls them. Migrate `before_*` to `before_write` (or
+  `before_transaction` for external calls), `on_*` to `after_write` (or
+  `after_commit` for effects), and the read-path heads to their `after_*`
+  names.
+- Do not spawn Tasks that read the written row from inside the transaction
+  (`before_write`/`after_write`): the row is not visible to other processes
+  until commit — use `after_commit`.
 - Group hooks: define a module with `use Arke.System.Group` and
   `group id: :my_group do end` (the do-block is required; only `:id` is
   kept). Membership comes from `group.json` (`"arke_list": [...]`) or an
@@ -60,11 +89,15 @@
   {"group": [{"id": "auditable", "label": "Auditable", "arke_list": ["person"]}]}
   ```
 
-- Hook execution order (create): `before_load` → validate → `before_create` →
-  group `before_unit_create` → persistence → `on_create` → group
-  `on_unit_create`. On delete the group/arke order is inverted: persistence
-  runs BEFORE `on_unit_delete`/`on_delete`, so "after" delete hooks cannot
-  veto the delete.
+- Hook execution order (create/update): `before_load` → validate →
+  `before_transaction` (arke, then groups) → [txn: `before_write` (arke,
+  then groups) → persistence → `after_write` (arke) → link sync →
+  `after_write` (groups)] → commit → `after_commit`. On delete the group/arke
+  order is inverted on the after side, and persistence runs BEFORE the
+  `after_write` hooks — they cannot veto the delete, but their error still
+  rolls it back.
+- Group modules use the same DSL slots; while a group's hooks run,
+  `hook.group` is set to the group unit.
 - To skip persisting a parameter, set `only_runtime: true` in the parameter's
   metadata override on the Arke (note: the registered global parameter id is
   `only_run_time`, but the metadata key the code honors is `only_runtime`).

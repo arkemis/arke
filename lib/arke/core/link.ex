@@ -17,17 +17,22 @@ defmodule Arke.Core.Link do
 
   use Arke.System
   alias Arke.Boundary.{ArkeManager, GroupManager}
+  alias Arke.Hook
 
   arke id: :arke_link do
   end
 
-  def on_create(
-        _,
-        %{
-          data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
-          metadata: %{project: project} = metadata
-        } = unit
-      ) do
+  after_commit(:sync_managers)
+
+  defp sync_managers(%Hook{unit: unit} = hook) do
+    sync(hook.op, unit)
+    {:ok, hook}
+  end
+
+  defp sync(:create, %{
+         data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
+         metadata: %{project: project} = metadata
+       }) do
     ArkeManager.add_link(
       String.to_existing_atom(parent_id),
       project,
@@ -35,17 +40,12 @@ defmodule Arke.Core.Link do
       String.to_existing_atom(child_id),
       metadata
     )
-
-    {:ok, unit}
   end
 
-  def on_create(
-        _,
-        %{
-          data: %{type: "group", parent_id: parent_id, child_id: child_id},
-          metadata: %{project: project} = metadata
-        } = unit
-      ) do
+  defp sync(:create, %{
+         data: %{type: "group", parent_id: parent_id, child_id: child_id},
+         metadata: %{project: project} = metadata
+       }) do
     GroupManager.add_link(
       String.to_existing_atom(parent_id),
       project,
@@ -53,75 +53,38 @@ defmodule Arke.Core.Link do
       String.to_existing_atom(child_id),
       metadata
     )
-
-    {:ok, unit}
   end
 
-  def on_create(
-        _,
-        %{
-          data: %{type: _type, parent_id: _parent_id, child_id: _child_id},
-          metadata: %{project: _project} = _metadata
-        } = unit
-      ) do
-    {:ok, unit}
-  end
-
-  def on_update(
-        _,
-        _old_unit,
-        %{
-          data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
-          metadata: %{project: project} = metadata
-        } = unit
-      ) do
+  defp sync(:update, %{
+         data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
+         metadata: %{project: project} = metadata
+       }) do
     ArkeManager.update_parameter(parent_id, child_id, project, metadata)
-    {:ok, unit}
   end
 
-  def on_update(_, _old_unit, unit), do: {:ok, unit}
-
-  def on_delete(
-        _,
-        %{
-          data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
-          metadata: %{project: project} = _metadata
-        } = unit
-      ) do
+  defp sync(:delete, %{
+         data: %{type: "parameter", parent_id: parent_id, child_id: child_id},
+         metadata: %{project: project}
+       }) do
     ArkeManager.remove_link(
       String.to_existing_atom(parent_id),
       project,
       :parameters,
       String.to_existing_atom(child_id)
     )
-
-    {:ok, unit}
   end
 
-  def on_delete(
-        _,
-        %{
-          data: %{type: "group", parent_id: parent_id, child_id: child_id},
-          metadata: %{project: project} = _metadata
-        } = unit
-      ) do
+  defp sync(:delete, %{
+         data: %{type: "group", parent_id: parent_id, child_id: child_id},
+         metadata: %{project: project}
+       }) do
     GroupManager.remove_link(
       String.to_existing_atom(parent_id),
       project,
       :arke_list,
       String.to_existing_atom(child_id)
     )
-
-    {:ok, unit}
   end
 
-  def on_delete(
-        _,
-        %{
-          data: %{type: _type, parent_id: _parent_id, child_id: _child_id},
-          metadata: %{project: _project} = _metadata
-        } = unit
-      ) do
-    {:ok, unit}
-  end
+  defp sync(_op, _unit), do: :ok
 end

@@ -50,6 +50,7 @@ defmodule Arke.MixProject do
   defp deps do
     [
       {:jason, "~> 1.0"},
+      {:telemetry, "~> 1.0"},
       {:uniq, "~> 0.6"},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},

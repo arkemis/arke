@@ -35,7 +35,7 @@ defmodule Arke.LinkManager do
         )
 
       {:ok, _} ->
-        Error.create(:link, "link already exists")
+        Error.create(:link, "link already exists: `#{parent.id}` -> `#{child.id}` (#{type})")
     end
   end
 

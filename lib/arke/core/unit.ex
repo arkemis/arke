@@ -104,7 +104,7 @@ defmodule Arke.Core.Unit do
               runtime_data
             )
 
-          {:ok, loaded_unit} = ArkeManager.call_func(arke, :on_load, [unit, persistence_fn])
+          {:ok, loaded_unit} = ArkeManager.call_func(arke, :after_load, [unit, persistence_fn])
           loaded_unit
         end
     end

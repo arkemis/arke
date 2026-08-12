@@ -13,12 +13,20 @@
   ```
 
   `arke_or_group_id` must be an ARKE id — a Group id silently no-ops.
+- Link sync is strict and transactional: a link value pointing at a unit that
+  does not exist fails the WHOLE write with `{:error, _}` and rolls it back
+  (definition units — arkes, groups, parameter types — keep best-effort sync).
+  Create the target unit first.
+- Two link parameters on the same unit pointing at the same target with the
+  same `connection_type` collapse into ONE `arke_link` row (the key is
+  `(type, parent_id, child_id)`); the second write surfaces
+  "link already exists". Give such parameters distinct connection types.
 - `direction` semantics are easy to invert: `direction: "child"` means the
   unit being created is the PARENT and the referenced id the child;
   `direction: "parent"` means the referenced id is the parent.
 - `multiple: true` link updates diff old vs new lists one node at a time (no
-  bulk) and swallow individual failures — for bulk link changes use
-  `Arke.LinkManager` directly.
+  bulk); the first failing node fails the write and rolls everything back.
+  For bulk link changes use `Arke.LinkManager` directly.
 - Direct edge management:
 
   ```elixir
@@ -29,8 +37,8 @@
   When using string ids, pass ALL five arguments — the default values live on
   the `%Unit{}` clauses, so a 4-argument call with strings raises.
 - A duplicate `add_node` returns
-  `{:error, [%{context: "link", message: "link already exists"}]}` — an error
-  tuple, not a raise.
+  `{:error, [%{context: "link", message: "link already exists: ..."}]}` (the
+  message names the parent/child/type) — an error tuple, not a raise.
 - Graph traversal from a query:
 
   ```elixir

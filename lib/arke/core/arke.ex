@@ -20,19 +20,32 @@ defmodule Arke.Core.Arke do
 
   use Arke.System
   alias Arke.Boundary.ArkeManager
+  alias Arke.Hook
 
   arke id: :arke do
   end
 
-  def on_create(arke, unit) do
-    unit = check_base_parameters(arke, unit)
+  after_write(:ensure_base_parameters, on: :create)
+  after_commit(:sync_manager)
+
+  defp ensure_base_parameters(%Hook{arke: arke, unit: unit} = hook),
+    do: {:ok, %{hook | unit: check_base_parameters(arke, unit)}}
+
+  defp sync_manager(%Hook{op: :create, unit: unit} = hook) do
     ArkeManager.create(unit)
-    {:ok, unit}
+    {:ok, hook}
   end
 
-  def on_update(_, _old_unit, %{id: id, metadata: %{project: project}} = unit) do
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     ArkeManager.update(id, project, unit)
-    {:ok, unit}
+    {:ok, hook}
+  end
+
+  defp sync_manager(%Hook{op: :delete, unit: unit} = hook) do
+    ArkeManager.remove(unit)
+    {:ok, hook}
   end
 
   def handle_link_init(u, p) when is_binary(u),
@@ -42,11 +55,6 @@ defmodule Arke.Core.Arke do
     do: %{id: u, metadata: %{"parameter_id" => Atom.to_string(p)}}
 
   def handle_link_init(u, _), do: u
-
-  def on_delete(_, unit) do
-    ArkeManager.remove(unit)
-    {:ok, unit}
-  end
 
   def check_base_parameters(arke, %{data: %{parameters: []}} = unit),
     do: Arke.Core.Unit.update(unit, parameters: base_parameters(arke, unit))

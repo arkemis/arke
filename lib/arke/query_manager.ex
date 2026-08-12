@@ -37,9 +37,13 @@ defmodule Arke.QueryManager do
     - in =>  value is in a collection => `IN`
 
   """
+  require Logger
+
   alias Arke.Boundary.{ArkeManager, ParameterManager, GroupManager}
   alias Arke.Validator
   alias Arke.LinkManager
+  alias Arke.Hook
+  alias Arke.Hook.{Deferred, Pipeline}
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
   alias Arke.Errors.ArkeError
   alias Arke.Utils.ErrorGenerator, as: Error
@@ -123,6 +127,48 @@ defmodule Arke.QueryManager do
   defp parse_link_direction(direction), do: direction
 
   @doc """
+  Runs `fun` inside a database transaction.
+
+  Every `Arke.QueryManager` write performed inside `fun` joins the
+  transaction; their `after_commit` hooks defer to the outermost commit.
+  Returning `{:error, reason}` from `fun` rolls everything back and returns
+  `{:error, reason}`; `{:ok, value}` commits and returns `{:ok, value}`.
+
+  ## Options
+    - `timeout:` => transaction timeout in ms, passed to the adapter
+
+  ## Example
+      iex> Arke.QueryManager.transaction(:my_project, fn ->
+      ...>   with {:ok, a} <- QueryManager.create(...),
+      ...>        {:ok, b} <- QueryManager.update(...),
+      ...>        do: {:ok, {a, b}}
+      ...> end, timeout: 600_000)
+  """
+  @spec transaction(project :: atom(), fun :: (-> any()), opts :: keyword()) ::
+          {:ok, any()} | {:error, any()}
+  def transaction(project, fun, opts \\ [])
+
+  def transaction(_project, fun, opts) do
+    transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
+
+    Deferred.begin()
+
+    result = settle_on_abort(fn -> transaction_fn.(fun, opts) end)
+
+    Deferred.finish()
+
+    case result do
+      {:error, errors} = error ->
+        Deferred.rollback(errors)
+        error
+
+      other ->
+        Deferred.commit()
+        other
+    end
+  end
+
+  @doc """
   Function to create an element
 
   ## Parameters
@@ -144,16 +190,10 @@ defmodule Arke.QueryManager do
     persistence_fn = @persistence[:arke_postgres][:create]
 
     with %Unit{} = unit <- Unit.load(arke, args, :create),
-         {:ok, unit} <- Validator.validate(unit, :create, project),
-         {:ok, unit} <- ArkeManager.call_func(arke, :before_create, [arke, unit]),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :before_unit_create),
-         {:ok, unit} <- handle_link_parameters_unit(arke, unit),
-         {:ok, unit} <- persistence_fn.(project, unit),
-         {:ok, unit} <- ArkeManager.call_func(arke, :on_create, [arke, unit]),
-         {:ok, unit} <- handle_link_parameters(unit, %{}),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :on_unit_create),
-         do: {:ok, unit},
-         else: ({:error, errors} -> {:error, errors})
+         {:ok, unit} <- Validator.validate(unit, :create, project) do
+      %Hook{op: :create, arke: arke, project: project, unit: unit}
+      |> execute_write(fn unit -> persistence_fn.(project, unit) end, %{})
+    end
   end
 
   defp handle_link_parameters_unit(%{id: :arke_link} = _, unit), do: {:ok, unit}
@@ -183,10 +223,6 @@ defmodule Arke.QueryManager do
 
     case length(errors) > 0 do
       true ->
-        Enum.map(link_units, fn {_p, u} ->
-          delete(project, u)
-        end)
-
         {:error, errors}
 
       false ->
@@ -220,18 +256,78 @@ defmodule Arke.QueryManager do
   defp handle_create_on_link_parameters_unit(_, _, parameter, _, value),
     do: {:ok, parameter, value}
 
-  def handle_group_call_func(arke, unit, func) do
-    GroupManager.get_groups_by_arke(arke)
-    |> Enum.reduce_while(unit, fn group, new_unit ->
-      with {:ok, new_unit} <- GroupManager.call_func(group, func, [arke, new_unit]),
-           do: {:cont, new_unit},
-           else: ({:error, errors} -> {:halt, {:error, errors}})
-    end)
-    |> check_group_manager_functions_errors()
+  defp execute_write(%Hook{arke: arke} = hook, persist, old_data) do
+    result =
+      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)) do
+        in_transaction(arke, fn ->
+          with {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
+               {:ok, unit} <- handle_link_parameters_unit(arke, hook.unit),
+               {:ok, unit} <- persist.(unit),
+               {:ok, hook} <-
+                 Pipeline.run(:after_write, %{hook | unit: unit}, arke_sources(arke)),
+               {:ok, unit} <- handle_link_parameters(hook.unit, old_data),
+               {:ok, hook} <-
+                 Pipeline.run(:after_write, %{hook | unit: unit}, group_sources(arke)),
+               do: {:ok, hook}
+        end)
+      end
+
+    finish_write(result, hook, arke, fn final -> {:ok, final.unit} end)
   end
 
-  def check_group_manager_functions_errors({:error, errors} = _), do: {:error, errors}
-  def check_group_manager_functions_errors(unit), do: {:ok, unit}
+  defp finish_write(result, hook, arke, on_success) do
+    case result do
+      {:ok, %Hook{} = final} ->
+        Deferred.on_commit(fn -> Pipeline.run_isolated(:after_commit, final, sources(arke)) end)
+
+        # This write is durable but an enclosing transaction can still abort
+        # it, and only that outer frame knows: queue the compensator too.
+        Deferred.on_rollback(fn error ->
+          Pipeline.run_isolated(:after_rollback, %{final | error: error}, sources(arke))
+        end)
+
+        Deferred.commit()
+        on_success.(final)
+
+      {:error, errors} ->
+        Pipeline.run_isolated(:after_rollback, %{hook | error: errors}, sources(arke))
+        Deferred.rollback(errors)
+        {:error, errors}
+    end
+  end
+
+  defp in_transaction(arke, fun) do
+    if Map.get(arke.metadata || %{}, :transaction, true) == false do
+      fun.()
+    else
+      transaction_fn = @persistence[:arke_postgres][:transaction] || fn f, _opts -> f.() end
+      Deferred.begin()
+
+      result = settle_on_abort(fn -> transaction_fn.(fun, []) end)
+
+      Deferred.finish()
+      result
+    end
+  end
+
+  # A raise/throw/exit skips `finish_write`, so the queues would outlive the
+  # transaction that filled them and fire against the next successful write.
+  defp settle_on_abort(fun) do
+    fun.()
+  catch
+    kind, reason ->
+      Deferred.finish()
+      Deferred.rollback(reason)
+      :erlang.raise(kind, reason, __STACKTRACE__)
+  end
+
+  defp sources(arke), do: arke_sources(arke) ++ group_sources(arke)
+
+  defp arke_sources(%{__module__: module}), do: [{module, nil}]
+
+  defp group_sources(arke),
+    do: Enum.map(GroupManager.get_groups_by_arke(arke), fn group -> {group.__module__, group} end)
 
   @doc """
   Function to update an element
@@ -257,16 +353,10 @@ defmodule Arke.QueryManager do
 
     with %Unit{} = unit <- Unit.update(current_unit, args),
          {:ok, unit} <- update_at_on_update(unit),
-         {:ok, unit} <- Validator.validate(unit, :update, project),
-         {:ok, unit} <- ArkeManager.call_func(arke, :before_update, [arke, current_unit, unit]),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :before_unit_update),
-         {:ok, unit} <- handle_link_parameters_unit(arke, unit),
-         {:ok, unit} <- persistence_fn.(project, unit),
-         {:ok, unit} <- ArkeManager.call_func(arke, :on_update, [arke, current_unit, unit]),
-         {:ok, unit} <- handle_link_parameters(unit, data),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :on_unit_update),
-         do: {:ok, unit},
-         else: ({:error, errors} -> {:error, errors})
+         {:ok, unit} <- Validator.validate(unit, :update, project) do
+      %Hook{op: :update, arke: arke, project: project, unit: unit, old_unit: current_unit}
+      |> execute_write(fn unit -> persistence_fn.(project, unit) end, data)
+    end
   end
 
   def update_key(
@@ -278,16 +368,10 @@ defmodule Arke.QueryManager do
 
     with %Unit{} = unit <- Unit.update(current_unit, args),
          {:ok, unit} <- update_at_on_update(unit),
-         {:ok, unit} <- Validator.validate(unit, :update, project),
-         {:ok, unit} <- ArkeManager.call_func(arke, :before_update, [arke, current_unit, unit]),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :before_unit_update),
-         {:ok, unit} <- handle_link_parameters_unit(arke, unit),
-         {:ok, unit} <- persistence_fn.(current_unit, unit),
-         {:ok, unit} <- ArkeManager.call_func(arke, :on_update, [arke, current_unit, unit]),
-         {:ok, unit} <- handle_link_parameters(unit, data),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :on_unit_update),
-         do: {:ok, unit},
-         else: ({:error, errors} -> {:error, errors})
+         {:ok, unit} <- Validator.validate(unit, :update, project) do
+      %Hook{op: :update, arke: arke, project: project, unit: unit, old_unit: current_unit}
+      |> execute_write(fn unit -> persistence_fn.(current_unit, unit) end, data)
+    end
   end
 
   defp update_at_on_update(unit) do
@@ -312,14 +396,21 @@ defmodule Arke.QueryManager do
   def delete(project, %{arke_id: arke_id} = unit) do
     arke = ArkeManager.get(arke_id, project)
     persistence_fn = @persistence[:arke_postgres][:delete]
+    hook = %Hook{op: :delete, arke: arke, project: project, unit: unit}
 
-    with {:ok, unit} <- ArkeManager.call_func(arke, :before_delete, [arke, unit]),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :before_unit_delete),
-         {:ok, nil} <- persistence_fn.(project, unit),
-         {:ok, unit} <- handle_group_call_func(arke, unit, :on_unit_delete),
-         {:ok, _unit} <- ArkeManager.call_func(arke, :on_delete, [arke, unit]),
-         do: {:ok, nil},
-         else: ({:error, errors} -> {:error, errors})
+    result =
+      with {:ok, hook} <- Pipeline.run(:before_transaction, hook, sources(arke)) do
+        in_transaction(arke, fn ->
+          with {:ok, hook} <- Pipeline.run(:before_write, hook, arke_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:before_write, hook, group_sources(arke)),
+               {:ok, nil} <- persistence_fn.(project, hook.unit),
+               {:ok, hook} <- Pipeline.run(:after_write, hook, group_sources(arke)),
+               {:ok, hook} <- Pipeline.run(:after_write, hook, arke_sources(arke)),
+               do: {:ok, hook}
+        end)
+      end
+
+    finish_write(result, hook, arke, fn _final -> {:ok, nil} end)
   end
 
   @doc """
@@ -353,10 +444,16 @@ defmodule Arke.QueryManager do
     {project, opts} = Keyword.pop!(opts, :project)
     {arke, opts} = Keyword.pop(opts, :arke, nil)
     {distinct, opts} = Keyword.pop(opts, :distinct, nil)
+    {lock, opts} = Keyword.pop(opts, :lock, false)
+
+    if lock and Deferred.depth() == 0,
+      do: raise(ArgumentError, "lock: is only valid inside a transaction")
 
     arke = get_arke(arke, project)
 
-    query(project: project, arke: arke, distinct: distinct) |> where(opts)
+    query(project: project, arke: arke, distinct: distinct)
+    |> Query.set_lock(lock)
+    |> where(opts)
   end
 
   defp get_arke(nil, _), do: nil
@@ -752,42 +849,75 @@ defmodule Arke.QueryManager do
     ArkeManager.get_parameter(arke, project, key)
   end
 
-  defp handle_link_parameters(
+  # Definition units (arkes, groups, parameters) keep best-effort sync: their
+  # link targets (base parameters, system arkes) live in :arke_system, not in
+  # the project, so strictness would fail every definition create.
+  defp handle_link_parameters(%{arke_id: arke_id, metadata: %{project: project}} = unit, old_data) do
+    if definition_unit?(arke_id, project) do
+      case do_handle_link_parameters(unit, old_data) do
+        {:error, errors} ->
+          Logger.debug("link sync failed for `#{unit.id}`: #{inspect(errors)}")
+          {:ok, unit}
+
+        ok ->
+          ok
+      end
+    else
+      do_handle_link_parameters(unit, old_data)
+    end
+  end
+
+  defp definition_unit?(arke_id, _project) when arke_id in [:arke, :group], do: true
+
+  defp definition_unit?(arke_id, project) do
+    case ArkeManager.get(arke_id, project) do
+      nil -> false
+      arke -> Enum.any?(GroupManager.get_groups_by_arke(arke), &(&1.id == :parameter))
+    end
+  end
+
+  defp do_handle_link_parameters(
          %{arke_id: arke_id, metadata: %{project: project}, data: new_data, id: _id} = unit,
          old_data
        ) do
     arke = ArkeManager.get(arke_id, project)
 
     Enum.filter(ArkeManager.get_parameters(arke), fn p -> p.arke_id == :link end)
-    |> Enum.each(fn p ->
+    |> Enum.reduce_while({:ok, unit}, fn p, acc ->
       old_value = Map.get(old_data, p.id, nil)
       new_value = Map.get(new_data, p.id, nil)
-      handle_link_parameter(unit, p, old_value, new_value)
-    end)
 
-    {:ok, unit}
+      case handle_link_parameter(unit, p, old_value, new_value) do
+        {:error, errors} -> {:halt, {:error, errors}}
+        _ -> {:cont, acc}
+      end
+    end)
   end
 
   defp handle_link_parameter(_, nil, _, _), do: nil
 
   defp handle_link_parameter(unit, %{data: %{multiple: false}} = parameter, old_value, new_value) do
-    update_parameter_link(
-      unit,
-      parameter,
-      normalize_value(old_value),
-      :delete,
-      old_value == new_value
-    )
-
-    update_parameter_link(
-      unit,
-      parameter,
-      normalize_value(new_value),
-      :add,
-      old_value == new_value
-    )
-
-    {:ok, unit}
+    with {:ok, _} <-
+           link_result(
+             update_parameter_link(
+               unit,
+               parameter,
+               normalize_value(old_value),
+               :delete,
+               old_value == new_value
+             )
+           ),
+         {:ok, _} <-
+           link_result(
+             update_parameter_link(
+               unit,
+               parameter,
+               normalize_value(new_value),
+               :add,
+               old_value == new_value
+             )
+           ),
+         do: {:ok, unit}
   end
 
   defp handle_link_parameter(unit, %{data: %{multiple: true}} = parameter, old_value, new_value) do
@@ -799,16 +929,22 @@ defmodule Arke.QueryManager do
 
     nodes_to_add = Enum.map(new_value -- old_value, &normalize_value(&1))
 
-    Enum.each(nodes_to_delete, fn n ->
-      update_parameter_link(unit, parameter, n, :delete, false)
-    end)
-
-    Enum.each(nodes_to_add, fn n ->
-      update_parameter_link(unit, parameter, n, :add, false)
-    end)
-
-    {:ok, unit}
+    with {:ok, _} <- update_parameter_links(unit, parameter, nodes_to_delete, :delete),
+         {:ok, _} <- update_parameter_links(unit, parameter, nodes_to_add, :add),
+         do: {:ok, unit}
   end
+
+  defp update_parameter_links(unit, parameter, nodes, action) do
+    Enum.reduce_while(nodes, {:ok, unit}, fn n, acc ->
+      case link_result(update_parameter_link(unit, parameter, n, action, false)) do
+        {:error, errors} -> {:halt, {:error, errors}}
+        _ -> {:cont, acc}
+      end
+    end)
+  end
+
+  defp link_result({:error, errors}), do: {:error, errors}
+  defp link_result(_), do: {:ok, nil}
 
   defp update_parameter_link(_, _, _, _, true), do: nil
   defp update_parameter_link(_, _, nil, _, _), do: nil

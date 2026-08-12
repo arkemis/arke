@@ -25,6 +25,7 @@ defmodule Arke.Test.Persistence do
       config :arke,
         persistence: %{
           arke_postgres: %{
+            transaction: &Arke.Test.Persistence.transaction/2,
             create: &Arke.Test.Persistence.create/2,
             update: &Arke.Test.Persistence.update/2,
             update_key: &Arke.Test.Persistence.update_key/2,
@@ -66,6 +67,35 @@ defmodule Arke.Test.Persistence do
   def reset do
     :ets.delete_all_objects(@table)
     :ok
+  end
+
+  @doc """
+  Transaction seam: snapshots the table, restores it when the wrapped
+  function fails or raises. Serial tests only.
+  """
+  @spec transaction((-> any()), keyword()) :: any()
+  def transaction(fun, _opts \\ []) do
+    snapshot = :ets.tab2list(@table)
+
+    try do
+      case fun.() do
+        {:error, _} = error ->
+          restore(snapshot)
+          error
+
+        other ->
+          other
+      end
+    rescue
+      e ->
+        restore(snapshot)
+        reraise e, __STACKTRACE__
+    end
+  end
+
+  defp restore(snapshot) do
+    :ets.delete_all_objects(@table)
+    :ets.insert(@table, snapshot)
   end
 
   @spec create(atom(), Unit.t()) :: {:ok, Unit.t()}

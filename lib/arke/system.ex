@@ -15,17 +15,19 @@
 defmodule Arke.System do
   defmacro __using__(_) do
     quote do
-      #      @after_compile __MODULE__
       Module.register_attribute(__MODULE__, :arke, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :groups, accumulate: true, persist: true)
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)
+      Module.register_attribute(__MODULE__, :arke_hooks, accumulate: true)
 
       Module.put_attribute(__MODULE__, :system_arke, true)
 
       import unquote(__MODULE__),
         only: [arke: 1, arke: 2, parameter: 3, parameter: 2, group: 1, group: 2]
 
-      #      @before_compile unquote(__MODULE__)
+      import Arke.Hook.DSL
+
+      @before_compile Arke.Hook.DSL
 
       def arke_from_attr(),
         do: Keyword.get(__MODULE__.__info__(:attributes), :arke, []) |> List.first()
@@ -37,19 +39,12 @@ defmodule Arke.System do
         unit.data.parameters
       end
 
-      def on_load(unit, _persistence_fn), do: {:ok, unit}
       def before_load(data, _persistence_fn), do: {:ok, data}
-      def on_validate(arke, unit), do: {:ok, unit}
+      def after_load(unit, _persistence_fn), do: {:ok, unit}
       def before_validate(arke, unit), do: {:ok, unit}
-      def on_create(arke, unit), do: {:ok, unit}
-      def before_create(arke, unit), do: {:ok, unit}
-      def on_struct_encode(_, _, data, opts), do: {:ok, data}
+      def after_validate(arke, unit), do: {:ok, unit}
       def before_struct_encode(_, unit), do: {:ok, unit}
-      def on_update(arke, old_unit, unit), do: {:ok, unit}
-      def before_update(arke, old_unit, unit), do: {:ok, unit}
-      def before_update(arke, unit), do: {:ok, unit}
-      def on_delete(arke, unit), do: {:ok, unit}
-      def before_delete(arke, unit), do: {:ok, unit}
+      def after_struct_encode(_, _, data, opts), do: {:ok, data}
 
       def after_get_struct(arke, unit, struct), do: struct
       def after_get_struct(arke, struct), do: struct
@@ -215,19 +210,12 @@ defmodule Arke.System do
       defp on_unit_import(_project, existing_units, units_args, error_units),
         do: {existing_units, units_args, error_units}
 
-      defoverridable on_load: 2,
-                     before_load: 2,
-                     on_validate: 2,
+      defoverridable before_load: 2,
+                     after_load: 2,
                      before_validate: 2,
-                     on_create: 2,
-                     before_create: 2,
+                     after_validate: 2,
                      before_struct_encode: 2,
-                     on_struct_encode: 4,
-                     on_update: 3,
-                     before_update: 2,
-                     before_update: 3,
-                     on_delete: 2,
-                     before_delete: 2,
+                     after_struct_encode: 4,
                      after_get_struct: 2,
                      after_get_struct: 3,
 

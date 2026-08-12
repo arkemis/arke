@@ -42,6 +42,23 @@
   `where(:"customer.name__eq" => "Ada")`.
 - Executors: `all/1`, `one/1`, `count/1`, `raw/1` (SQL + params),
   `pseudo_query/1` (Ecto query), `pagination/3` (`{count, units}`).
+- Every single write already runs in its own transaction (hooks included).
+  Wrap MULTI-write flows in `QueryManager.transaction/3` — returning
+  `{:error, reason}` rolls back every write; never raise to abort:
+
+  ```elixir
+  QueryManager.transaction(:my_project, fn ->
+    with {:ok, a} <- QueryManager.create(:my_project, arke, args),
+         {:ok, b} <- QueryManager.update(unit, args),
+         do: {:ok, {a, b}}
+  end, timeout: 600_000)
+  ```
+
+  Nested `QueryManager` writes join the enclosing transaction and their
+  `after_commit` hooks defer to the outermost commit.
+- For read-modify-write flows (balances, counters, caps) take a row lock with
+  `lock: true` on `get_by`/`filter_by` (`SELECT ... FOR UPDATE`). It raises
+  `ArgumentError` outside a transaction.
 - Boolean composition: `conditions/1` output is UNRESOLVED and must go
   through `and_/3` / `or_/3` (which also accept nested filters); never pass
   it to `filter/2` directly:

@@ -10,8 +10,9 @@ the same struct shape, keyed by a project (tenant). Schemas are defined in
 JSON registry files (the source of truth), while `Arke.System` modules attach
 behavior hooks to them by id; loaded schemas live in ETS behind GenServer
 managers, and all CRUD flows through `Arke.QueryManager`, which runs
-a validation + lifecycle-hook pipeline and delegates I/O to an injected
-persistence layer (usually `arke_postgres`) — core Arke performs no I/O itself.
+a validation + lifecycle-hook pipeline inside a database transaction and
+delegates I/O to an injected persistence layer (usually `arke_postgres`) —
+core Arke performs no I/O itself.
 
 Do not assume Ecto, ActiveRecord or JSON-schema conventions apply: read the
 topic rules in `usage-rules/` before using a feature. Sibling packages plug

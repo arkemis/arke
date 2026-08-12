@@ -20,6 +20,7 @@ defmodule Arke.Core.File do
   use Arke.System
 
   alias Arke.Boundary.FileManager
+  alias Arke.Hook
   require Logger
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
@@ -27,9 +28,19 @@ defmodule Arke.Core.File do
   arke id: :arke_file do
   end
 
-  def on_delete(_arke, %{id: id, metadata: %{project: project}} = unit) do
+  before_transaction(:upload, on: :create)
+  after_rollback(:remove_uploaded, on: :create)
+  before_write(:delete_stored_file, on: :delete)
+  after_commit(:evict_cache, on: :delete)
+
+  defp evict_cache(%Hook{unit: %{id: id, metadata: %{project: project}}} = hook) do
     FileManager.remove(id, project)
-    {:ok, unit}
+    {:ok, hook}
+  end
+
+  defp remove_uploaded(%Hook{unit: %{data: %{name: name, path: path}}} = hook) do
+    file_storage_module().delete_file("#{path}/#{name}")
+    {:ok, hook}
   end
 
   def before_load(
@@ -55,7 +66,7 @@ defmodule Arke.Core.File do
 
   def before_load(opts, _persistence_fn), do: {:ok, opts}
 
-  def on_struct_encode(_arke, %{metadata: %{project: _project}} = unit, data, opts) do
+  def after_struct_encode(_arke, %{metadata: %{project: _project}} = unit, data, opts) do
     load_files = Keyword.get(opts, :load_files, false)
 
     with true <- load_files,
@@ -72,33 +83,27 @@ defmodule Arke.Core.File do
     end
   end
 
-  def before_create(
-        _,
-        %{data: %{name: name, path: path, binary_data: binary}, runtime_data: runtime_data} = unit
-      ) do
+  defp upload(
+         %Hook{
+           unit:
+             %{data: %{name: name, path: path, binary_data: binary}, runtime_data: runtime_data} =
+               unit
+         } = hook
+       ) do
     is_public_file = is_public?(runtime_data)
 
     new_unit =
       Map.update(unit, :data, unit.data, fn udata -> Map.put(udata, :public, is_public_file) end)
 
     case file_storage_module().upload_file("#{path}/#{name}", binary, public: is_public_file) do
-      {:ok, _object} -> {:ok, new_unit}
+      {:ok, _object} -> {:ok, %{hook | unit: new_unit}}
       {:error, error} -> {:error, error}
     end
   end
 
-  def before_delete(_, %{data: %{name: name, path: path}} = unit) do
+  defp delete_stored_file(%Hook{unit: %{data: %{name: name, path: path}}} = hook) do
     case file_storage_module().delete_file("#{path}/#{name}") do
-      {:ok, _e} -> {:ok, unit}
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  def before_update(_, %{binary_data: binary} = unit) when is_nil(binary), do: {:ok, unit}
-
-  def before_update(_, %{data: %{name: name, path: path, binary_data: binary}} = unit) do
-    case file_storage_module().upload_file("#{path}/#{name}", binary) do
-      {:ok, _object} -> {:ok, unit}
+      {:ok, _e} -> {:ok, hook}
       {:error, error} -> {:error, error}
     end
   end

@@ -15,55 +15,26 @@
 defmodule Arke.System.Group do
   defmacro __using__(_) do
     quote do
-      #      @after_compile __MODULE__
       Module.register_attribute(__MODULE__, :group, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :parameters, accumulate: true, persist: false)
       Module.register_attribute(__MODULE__, :system_group, accumulate: false, persist: true)
+      Module.register_attribute(__MODULE__, :arke_hooks, accumulate: true)
       Module.put_attribute(__MODULE__, :system_group, true)
 
       import unquote(__MODULE__),
         only: [group: 1, group: 2, parameter: 3, parameter: 2]
 
-      #      @before_compile unquote(__MODULE__)
+      import Arke.Hook.DSL
+
+      @before_compile Arke.Hook.DSL
 
       def group_from_attr(),
         do: Keyword.get(__MODULE__.__info__(:attributes), :group, []) |> List.first()
 
       def is_group?(),
         do: Keyword.get(__MODULE__.__info__(:attributes), :system_group, []) |> List.first()
-
-      def on_unit_load(arke, data, _persistence_fn), do: {:ok, data}
-      def before_unit_load(_arke, data, _persistence_fn), do: {:ok, data}
-      def on_unit_validate(_arke, unit), do: {:ok, unit}
-      def before_unit_validate(_arke, unit), do: {:ok, unit}
-      def on_unit_create(_arke, unit), do: {:ok, unit}
-      def before_unit_create(_arke, unit), do: {:ok, unit}
-      def on_unit_struct_encode(unit, _), do: {:ok, unit}
-      def on_unit_update(_arke, unit), do: {:ok, unit}
-      def before_unit_update(_arke, unit), do: {:ok, unit}
-      def on_unit_delete(_arke, unit), do: {:ok, unit}
-      def before_unit_delete(_arke, unit), do: {:ok, unit}
-
-      defoverridable on_unit_load: 3,
-                     before_unit_load: 3,
-                     on_unit_validate: 2,
-                     before_unit_validate: 2,
-                     on_unit_create: 2,
-                     before_unit_create: 2,
-                     on_unit_struct_encode: 2,
-                     on_unit_update: 2,
-                     before_unit_update: 2,
-                     on_unit_delete: 2,
-                     before_unit_delete: 2
     end
   end
-
-  #  defmacro __before_compile__(env) do
-  #  end
-  #
-  #  def compile(translations) do
-  #
-  #  end
 
   ######################################################################################################################
   # Group MACRO #########################################################################################################

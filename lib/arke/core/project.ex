@@ -19,21 +19,29 @@ defmodule Arke.Core.Project do
   """
 
   use Arke.System
+  alias Arke.Hook
+  alias Arke.Utils.ErrorGenerator, as: Error
 
   @persistence Application.compile_env(:arke, :persistence)
 
-  arke id: :arke_project do
+  arke id: :arke_project, metadata: %{transaction: false} do
   end
 
-  def on_create(_, unit) do
+  after_write(:create_schema, on: :create)
+  after_write(:drop_schema, on: :delete)
+
+  defp create_schema(%Hook{unit: unit} = hook) do
     persistence_fn = @persistence[:arke_postgres][:create_project]
-    unit |> persistence_fn.()
-    {:ok, unit}
+
+    case persistence_fn.(unit) do
+      :error -> Error.create(:project, "cannot create project schema")
+      _ -> {:ok, hook}
+    end
   end
 
-  def on_delete(_, unit) do
+  defp drop_schema(%Hook{unit: unit} = hook) do
     persistence_fn = @persistence[:arke_postgres][:delete_project]
-    unit |> persistence_fn.()
-    {:ok, nil}
+    persistence_fn.(unit)
+    {:ok, hook}
   end
 end

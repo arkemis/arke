@@ -965,6 +965,9 @@
   {
     "id": "arke_project",
       "label": "Project",
+      "metadata": {
+        "transaction": false
+      },
 "parameters": [
       {
         "id": "label",

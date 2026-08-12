@@ -8,6 +8,7 @@
   config :arke,
     persistence: %{
       arke_postgres: %{
+        transaction: &ArkePostgres.transaction/2,  # (fun, opts) — omit and writes lose rollback guarantees
         create: &ArkePostgres.create/2,            # (project, unit)
         update: &ArkePostgres.update/2,            # (project, unit)
         update_key: &ArkePostgres.update_key/2,    # (current_unit, new_unit) — note the different signature

@@ -54,23 +54,28 @@ defmodule Arke.Core.Parameter do
   Macro defining a shared struct of parameter used across Arkes
   """
   use Arke.System.Group
+  alias Arke.Hook
 
   group id: "parameter" do
   end
 
-  def on_unit_create(_arke, %{id: _id, metadata: %{project: _project}} = unit) do
+  after_commit(:sync_manager)
+
+  defp sync_manager(%Hook{op: :create, unit: unit} = hook) do
     ParameterManager.create(unit)
-    {:ok, unit}
+    {:ok, hook}
   end
 
-  def on_unit_update(_, %{id: id, metadata: %{project: project}} = unit) do
+  defp sync_manager(
+         %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
+       ) do
     ParameterManager.update(id, project, unit)
-    {:ok, unit}
+    {:ok, hook}
   end
 
-  def on_unit_delete(_, %{id: _id, metadata: %{project: _project}} = unit) do
+  defp sync_manager(%Hook{op: :delete, unit: unit} = hook) do
     ParameterManager.remove(unit)
-    {:ok, unit}
+    {:ok, hook}
   end
 end
 
