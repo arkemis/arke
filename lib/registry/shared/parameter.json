@@ -90,6 +90,25 @@
     "required": false
   },
   {
+    "default_string": null,
+    "type": "string",
+    "format": "attribute",
+    "helper_text": "Storage bucket",
+    "id": "bucket",
+    "is_primary": false,
+    "label": "Bucket",
+    "max_length": null,
+    "min_length": null,
+    "multiple": false,
+    "nullable": true,
+    "persistence": "arke_parameter",
+    "required": false,
+    "strip": false,
+"lowercase": false,
+    "unique": false,
+    "values": null
+  },
+  {
     "default_string": "",
     "type": "string",
     "format": "attribute",

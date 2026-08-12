@@ -21,6 +21,7 @@ defmodule Arke.Core.File do
 
   alias Arke.Boundary.FileManager
   alias Arke.Hook
+  alias Arke.QueryManager
   require Logger
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
@@ -38,8 +39,8 @@ defmodule Arke.Core.File do
     {:ok, hook}
   end
 
-  defp remove_uploaded(%Hook{unit: %{data: %{name: name, path: path}}} = hook) do
-    file_storage_module().delete_file("#{path}/#{name}")
+  defp remove_uploaded(%Hook{unit: %{data: %{name: name, path: path} = data}} = hook) do
+    file_storage_module().delete_file("#{path}/#{name}", bucket: data[:bucket])
     {:ok, hook}
   end
 
@@ -86,29 +87,52 @@ defmodule Arke.Core.File do
   defp upload(
          %Hook{
            unit:
-             %{data: %{name: name, path: path, binary_data: binary}, runtime_data: runtime_data} =
-               unit
+             %{
+               data: %{name: name, path: path, binary_data: binary},
+               metadata: %{project: project},
+               runtime_data: runtime_data
+             } = unit
          } = hook
        ) do
     is_public_file = is_public?(runtime_data)
+    bucket = resolve_bucket(runtime_data, project)
+    path = "#{project}/#{path}"
 
     new_unit =
-      Map.update(unit, :data, unit.data, fn udata -> Map.put(udata, :public, is_public_file) end)
+      Map.update(unit, :data, unit.data, fn udata ->
+        Map.merge(udata, %{public: is_public_file, bucket: bucket, path: path})
+      end)
 
-    case file_storage_module().upload_file("#{path}/#{name}", binary, public: is_public_file) do
+    case file_storage_module().upload_file("#{path}/#{name}", binary,
+           public: is_public_file,
+           bucket: bucket
+         ) do
       {:ok, _object} -> {:ok, %{hook | unit: new_unit}}
       {:error, error} -> {:error, error}
     end
   end
 
-  defp delete_stored_file(%Hook{unit: %{data: %{name: name, path: path}}} = hook) do
-    case file_storage_module().delete_file("#{path}/#{name}") do
+  defp resolve_bucket(%{link_parameter: %{data: %{bucket: bucket}}}, _project)
+       when is_binary(bucket),
+       do: bucket
+
+  defp resolve_bucket(_runtime_data, project) do
+    case QueryManager.get_by(project: :arke_system, arke_id: :arke_project, id: project) do
+      %{data: %{bucket: bucket}} when is_binary(bucket) -> bucket
+      _ -> nil
+    end
+  end
+
+  defp delete_stored_file(%Hook{unit: %{data: %{name: name, path: path} = data}} = hook) do
+    case file_storage_module().delete_file("#{path}/#{name}", bucket: data[:bucket]) do
       {:ok, _e} -> {:ok, hook}
       {:error, error} -> {:error, error}
     end
   end
 
-  def get_url(%{data: %{public: true}} = unit), do: file_storage_module().get_public_url(unit)
+  def get_url(%{data: %{public: true} = data} = unit),
+    do: file_storage_module().get_public_url(unit, bucket: data[:bucket])
+
   def get_url(unit), do: get_signed_url(unit)
 
   def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit) do
@@ -118,7 +142,9 @@ defmodule Arke.Core.File do
       {:ok, result}
     else
       _ ->
-        case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}") do
+        case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}",
+               bucket: data[:bucket]
+             ) do
           {:ok, result} ->
             FileManager.add(unit, result)
             {:ok, result}

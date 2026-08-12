@@ -54,6 +54,12 @@
   → `GOOGLE_APPLICATION_CREDENTIALS_JSON` (inline JSON) → gcloud ADC
   (`application_default_credentials.json` in `$CLOUDSDK_CONFIG`, defaulting to
   `~/.config/gcloud`) → GCE metadata.
+- Per-project buckets: set `bucket` on the `arke_project` unit; a link
+  parameter's `bucket` metadata overrides it. It is resolved once at upload and
+  stamped on the file unit, so reads and deletes use the stored value and unset
+  means `DEFAULT_BUCKET`. Ops provisions the bucket and grants the service
+  account access — arke never creates one. New object keys are
+  `<project>/arke_file/<timestamp>/<name>`.
 - Signed URLs (V2) are signed with the service account private key, so they need
   service-account JSON credentials: metadata server and gcloud user credentials
   have no key to sign with and return `{:error, "error on signed url"}`. The
