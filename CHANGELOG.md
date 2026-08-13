@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.0] - 2026-08-12
+
+### Breaking changes
+- The pre-0.9 callback heads (before_*/on_*, group before_unit_*/on_unit_*, on_load, on_validate, on_struct_encode) are removed and are no longer called even though they still compile, so migrate them to the hook DSL and the after_* names; writes that used to fail silently now return {:error, _} (missing link targets, updates on missing rows, failed project DDL); two link parameters pointing at the same target with the same connection type now surface "link already exists", since there is one arke_link row per (type, parent, child); httpoison and timex are no longer transitive dependencies. by @ilyichv in [#168](https://github.com/arkemis/arke/pull/168)
+
+
+### Changed
+- Per-project file buckets by @ilyichv in [#169](https://github.com/arkemis/arke/pull/169)
+- Transactions and hook pipeline rework by @ilyichv in [#168](https://github.com/arkemis/arke/pull/168)
+- Run on maintenance branches by @ilyichv
+
 ## [0.8.0] - 2026-08-04
 
 ### Breaking changes
@@ -505,6 +516,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 * @ErikFerrari made their first contribution
 
+[0.9.0-rc.0]: https://github.com/arkemis/arke/compare/v0.8.0...v0.9.0-rc.0
 [0.8.0]: https://github.com/arkemis/arke/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/arkemis/arke/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/arkemis/arke/compare/v0.6.3...v0.6.4
