@@ -1,7 +1,7 @@
 defmodule Arke.MixProject do
   use Mix.Project
 
-  @version "0.9.0-rc.0"
+  @version "0.9.0-rc.1"
   @scm_url "https://github.com/arkemis/arke"
   @site_url "https://arkehub.com"
 
