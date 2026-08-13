@@ -16,6 +16,19 @@ defmodule Arke.Core.GroupTest do
       assert after_create.id == :group_test
     end
 
+    test "create with arke_list registers the members in the manager" do
+      group_model = ArkeManager.get(:group, :arke_system)
+
+      QueryManager.create(:test_schema, group_model, %{
+        id: "group_test_members",
+        name: "group_test_members",
+        arke_list: ["arke_test_support"]
+      })
+
+      members = GroupManager.get(:group_test_members, :test_schema).data.arke_list
+      assert Enum.map(members, & &1.id) == [:arke_test_support]
+    end
+
     test "delete" do
       group_model = ArkeManager.get(:group, :arke_system)
 
