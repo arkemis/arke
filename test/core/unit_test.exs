@@ -1,6 +1,30 @@
 defmodule Arke.Core.UnitTest do
   use Arke.Test.RepoCase
 
+  describe "metadata normalization" do
+    test "string keys become atoms, unknown keys and values stay untouched" do
+      metadata = %{
+        "transaction" => false,
+        "not_an_existing_atom_key_xyz" => 1,
+        "nested" => %{"inner" => 1}
+      }
+
+      unit = Unit.new(:unit_meta_norm, [], :arke, nil, metadata, nil, nil, __MODULE__)
+
+      assert unit.metadata[:transaction] == false
+      assert unit.metadata["not_an_existing_atom_key_xyz"] == 1
+      assert unit.metadata[:nested] == %{"inner" => 1}
+      refute Map.has_key?(unit.metadata, "transaction")
+    end
+
+    test "the atom entry wins over a stale string duplicate" do
+      metadata = %{"project" => "stale_string", :project => :test_schema}
+      unit = Unit.new(:unit_meta_collision, [], :arke, nil, metadata, nil, nil, __MODULE__)
+
+      assert unit.metadata == %{project: :test_schema}
+    end
+  end
+
   describe "Unit" do
     test "new" do
       # id, data, arke_id, link, metadata, inserted_at, updated_at, __module__

@@ -169,6 +169,21 @@ defmodule Arke.TransactionTest do
     end
   end
 
+  test "a string-keyed transaction flag, as reloaded from jsonb, still opts out" do
+    arke =
+      Arke.Core.Unit.update(hook_arke(), %{
+        metadata: Map.put(hook_arke().metadata, "transaction", false)
+      })
+
+    assert {:error, [%{message: "failed after write"}]} =
+             QueryManager.create(@project, arke,
+               id: "txn_string_optout",
+               hook_flag: "fail_after_write"
+             )
+
+    assert QueryManager.get_by(project: @project, id: "txn_string_optout") != nil
+  end
+
   test "after_commit still flushes for a transaction-opted-out arke" do
     arke_project = ArkeManager.get(:arke_project, :arke_system)
 
