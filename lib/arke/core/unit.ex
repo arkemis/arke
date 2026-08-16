@@ -218,6 +218,7 @@ defmodule Arke.Core.Unit do
 
     parsed_data =
       Enum.reduce(new_data, %{}, fn {parameter_id, value}, final_unit_data ->
+        parameter_id = existing_atom(parameter_id)
         new_value = parse_value(value, ArkeManager.get_parameter(arke, project, parameter_id))
         Map.put(final_unit_data, parameter_id, new_value)
       end)

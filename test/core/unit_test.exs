@@ -17,6 +17,16 @@ defmodule Arke.Core.UnitTest do
       refute Map.has_key?(unit.metadata, "transaction")
     end
 
+    test "update stores a string-keyed parameter under its atom" do
+      arke_model = ArkeManager.get(:arke_test_support, :arke_system)
+      unit = Unit.load(arke_model, [])
+
+      updated = Unit.update(unit, %{"string_support" => "renamed"})
+
+      assert updated.data.string_support == "renamed"
+      refute Map.has_key?(updated.data, "string_support")
+    end
+
     test "the atom entry wins over a stale string duplicate" do
       metadata = %{"project" => "stale_string", :project => :test_schema}
       unit = Unit.new(:unit_meta_collision, [], :arke, nil, metadata, nil, nil, __MODULE__)
