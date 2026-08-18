@@ -66,10 +66,10 @@ defmodule Arke.Utils.Gcp do
   end
 
   @doc """
-  A V2 signed url for the object, signed with the service account key.
+  A V2 signed url for the object.
 
-  Requires service account credentials: metadata server and gcloud user
-  credentials have no private key to sign with.
+  Signing is delegated to `Arke.Utils.Gcp.Auth.sign/1`, which uses the private
+  key when the credentials carry one and the IAM Credentials API otherwise.
   """
   def get_bucket_file_signed_url(file_path, opts) do
     if opts[:service_account] do
@@ -82,18 +82,13 @@ defmodule Arke.Utils.Gcp do
     resource = "/#{bucket(opts)}/#{URI.encode(file_path)}"
     string_to_sign = ["GET", "", "", expires, resource] |> Enum.join("\n")
 
-    case Auth.signer() do
-      {:ok, {client_email, pem}} ->
-        signature =
-          string_to_sign
-          |> :public_key.sign(:sha256, Auth.private_key(pem))
-          |> Base.encode64()
-
+    case Auth.sign(string_to_sign) do
+      {:ok, {client_email, signature}} ->
         qs =
           %{
             "GoogleAccessId" => client_email,
             "Expires" => expires,
-            "Signature" => signature
+            "Signature" => Base.encode64(signature)
           }
           |> URI.encode_query()
 

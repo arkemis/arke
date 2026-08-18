@@ -17,8 +17,7 @@ defmodule Arke.Utils.Gcp.Auth do
   Google credentials for `Arke.Utils.Gcp`.
 
   Resolves application default credentials, then either mints an OAuth access
-  token (`token/0`) or returns the service account key to sign blobs with
-  (`signer/0`).
+  token (`token/0`) or signs a payload (`sign/1`).
 
   Credentials are resolved on every call, first hit wins:
 
@@ -35,6 +34,8 @@ defmodule Arke.Utils.Gcp.Auth do
   @scope "https://www.googleapis.com/auth/cloud-platform"
   @jwt_grant "urn:ietf:params:oauth:grant-type:jwt-bearer"
   @metadata_url "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+  @metadata_email_url "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
+  @sign_blob_url "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts"
 
   @doc """
   An OAuth access token for the resolved credentials.
@@ -46,16 +47,60 @@ defmodule Arke.Utils.Gcp.Auth do
   end
 
   @doc """
-  The service account able to sign blobs: `{client_email, private_key_pem}`.
+  Signs `payload`, returning `{signer_email, signature}` with the raw signature
+  bytes — callers encode them as their url scheme requires.
 
-  Only service account credentials carry a private key; metadata server and
-  gcloud user credentials return `{:error, :no_private_key}`.
+  Service account credentials sign locally. Under Workload Identity there is no
+  private key, so the IAM Credentials API signs on our behalf. gcloud user
+  credentials can do the same, but cannot name the account they would be signing
+  as, so they need `config :arke, :storage_signer_account`.
   """
-  def signer() do
+  def sign(payload) do
     case credentials() do
-      {:ok, %{"private_key" => pem, "client_email" => email}} -> {:ok, {email, pem}}
-      {:ok, _other} -> {:error, :no_private_key}
+      {:ok, %{"private_key" => pem, "client_email" => email}} ->
+        {:ok, {email, :public_key.sign(payload, :sha256, private_key(pem))}}
+
+      {:ok, :metadata} ->
+        with {:ok, email} <- metadata_email(), do: sign_blob(email, payload)
+
+      {:ok, _other} ->
+        case Application.get_env(:arke, :storage_signer_account) do
+          nil -> {:error, :no_private_key}
+          email -> sign_blob(email, payload)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Signing is idempotent and now sits behind a network hop, where it used to be
+  # local cpu: a blip here breaks a download link, so this one call retries.
+  defp sign_blob(email, payload) do
+    with {:ok, token} <- token(),
+         {:ok, %{status: 200, body: %{"signedBlob" => signature}}} <-
+           request(
+             method: :post,
+             url: "#{@sign_blob_url}/#{email}:signBlob",
+             headers: [{"authorization", "Bearer #{token}"}],
+             json: %{payload: Base.encode64(payload)},
+             retry: :transient
+           ),
+         {:ok, signature} <- Base.decode64(signature) do
+      {:ok, {email, signature}}
+    else
+      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+      :error -> {:error, :invalid_signature}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Plain text, unlike every other metadata endpoint used here.
+  defp metadata_email() do
+    case request(url: @metadata_email_url, headers: [{"metadata-flavor", "Google"}]) do
+      {:ok, %{status: 200, body: email}} -> {:ok, String.trim(email)}
+      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+      {:error, exception} -> {:error, exception}
     end
   end
 
@@ -154,10 +199,7 @@ defmodule Arke.Utils.Gcp.Auth do
     "#{signing_input}.#{signature}"
   end
 
-  @doc """
-  Decodes a PEM private key into the term `:public_key.sign/3` expects.
-  """
-  def private_key(pem) do
+  defp private_key(pem) do
     pem |> :public_key.pem_decode() |> hd() |> :public_key.pem_entry_decode()
   end
 end

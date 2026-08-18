@@ -23,6 +23,7 @@ defmodule Arke.Test.Gcp do
     %{
       email: email,
       pem: :public_key.pem_encode([:public_key.pem_entry_encode(:PrivateKeyInfo, key)]),
+      private_key: key,
       public_key: {:RSAPublicKey, elem(key, 2), elem(key, 3)}
     }
   end

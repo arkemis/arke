@@ -42,7 +42,11 @@ defmodule Arke.Utils.GcpTest do
   describe "get_bucket_file_signed_url/2" do
     setup do
       account = TestGcp.service_account()
-      stub(Auth, :signer, fn -> {:ok, {account.email, account.pem}} end)
+
+      stub(Auth, :sign, fn payload ->
+        {:ok, {account.email, :public_key.sign(payload, :sha256, account.private_key)}}
+      end)
+
       {:ok, account: account}
     end
 
@@ -78,7 +82,7 @@ defmodule Arke.Utils.GcpTest do
 
   describe "get_bucket_file_signed_url/2 without a signing key" do
     test "(error) fails when the credentials carry no private key" do
-      stub(Auth, :signer, fn -> {:error, :no_private_key} end)
+      stub(Auth, :sign, fn _payload -> {:error, :no_private_key} end)
 
       assert {:error, "error on signed url"} =
                Gcp.get_bucket_file_signed_url(@file_path, bucket: @bucket)
