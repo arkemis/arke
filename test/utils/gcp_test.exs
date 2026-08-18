@@ -43,6 +43,8 @@ defmodule Arke.Utils.GcpTest do
     setup do
       account = TestGcp.service_account()
 
+      stub(Auth, :signer_email, fn -> {:ok, account.email} end)
+
       stub(Auth, :sign, fn payload ->
         {:ok, {account.email, :public_key.sign(payload, :sha256, account.private_key)}}
       end)
@@ -50,7 +52,7 @@ defmodule Arke.Utils.GcpTest do
       {:ok, account: account}
     end
 
-    test "signs the canonical GET string with the service account key", %{account: account} do
+    test "signs a v4 canonical request", %{account: account} do
       assert {:ok, %{signed_url: signed_url, expiration: expires}} =
                Gcp.get_bucket_file_signed_url(@file_path, bucket: @bucket)
 
@@ -61,17 +63,27 @@ defmodule Arke.Utils.GcpTest do
       assert path == @resource
 
       params = URI.decode_query(query)
-      assert params["GoogleAccessId"] == account.email
-      assert params["Expires"] == to_string(expires)
+      day = params["X-Goog-Date"] |> String.slice(0, 8)
 
-      string_to_sign = Enum.join(["GET", "", "", expires, @resource], "\n")
+      assert params["X-Goog-Algorithm"] == "GOOG4-RSA-SHA256"
+      assert params["X-Goog-Credential"] == "#{account.email}/#{day}/auto/storage/goog4_request"
+      assert params["X-Goog-Expires"] == "3600"
+      assert params["X-Goog-SignedHeaders"] == "host"
+      assert params["X-Goog-Date"] =~ ~r/^\d{8}T\d{6}Z$/
 
       assert :public_key.verify(
-               string_to_sign,
+               TestGcp.v4_string_to_sign(params, account.email, @resource),
                :sha256,
-               Base.decode64!(params["Signature"]),
+               Base.decode16!(params["X-Goog-Signature"], case: :lower),
                account.public_key
              )
+    end
+
+    test "percent-encodes the object path without touching the separators" do
+      assert {:ok, %{signed_url: signed_url}} =
+               Gcp.get_bucket_file_signed_url("dir/a?b c.png", bucket: @bucket)
+
+      assert URI.parse(signed_url).path == "/my-bucket/dir/a%3Fb%20c.png"
     end
 
     test "performs no request" do
@@ -82,7 +94,7 @@ defmodule Arke.Utils.GcpTest do
 
   describe "get_bucket_file_signed_url/2 without a signing key" do
     test "(error) fails when the credentials carry no private key" do
-      stub(Auth, :sign, fn _payload -> {:error, :no_private_key} end)
+      stub(Auth, :signer_email, fn -> {:error, :no_private_key} end)
 
       assert {:error, "error on signed url"} =
                Gcp.get_bucket_file_signed_url(@file_path, bucket: @bucket)

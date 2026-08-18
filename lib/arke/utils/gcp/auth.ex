@@ -56,17 +56,36 @@ defmodule Arke.Utils.Gcp.Auth do
   as, so they need `config :arke, :storage_signer_account`.
   """
   def sign(payload) do
+    with {:ok, email} <- signer_email() do
+      case credentials() do
+        {:ok, %{"private_key" => pem}} ->
+          {:ok, {email, :public_key.sign(payload, :sha256, private_key(pem))}}
+
+        _ ->
+          sign_blob(email, payload)
+      end
+    end
+  end
+
+  @doc """
+  The account signatures will be attributed to.
+
+  V4 signing puts the signer inside the payload, so callers need it before they
+  have anything to sign.
+  """
+  def signer_email() do
     case credentials() do
-      {:ok, %{"private_key" => pem, "client_email" => email}} ->
-        {:ok, {email, :public_key.sign(payload, :sha256, private_key(pem))}}
+      {:ok, %{"client_email" => email}} ->
+        {:ok, email}
 
       {:ok, :metadata} ->
-        with {:ok, email} <- metadata_email(), do: sign_blob(email, payload)
+        metadata_email()
 
       {:ok, _other} ->
+        # A human's ADC cannot name itself, so it has to be told.
         case Application.get_env(:arke, :storage_signer_account) do
           nil -> {:error, :no_private_key}
-          email -> sign_blob(email, payload)
+          email -> {:ok, email}
         end
 
       {:error, reason} ->

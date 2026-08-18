@@ -318,18 +318,18 @@ defmodule Arke.Utils.Gcp.AuthTest do
     end
 
     defp assert_signs(file_path, account) do
-      assert {:ok, %{signed_url: signed_url, expiration: expires}} =
+      assert {:ok, %{signed_url: signed_url}} =
                Arke.Utils.Gcp.get_bucket_file_signed_url(file_path, bucket: "my-bucket")
 
-      resource = "/my-bucket/#{URI.encode(file_path)}"
-      params = signed_url |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      %URI{path: resource, query: query} = URI.parse(signed_url)
+      params = URI.decode_query(query)
 
-      assert params["GoogleAccessId"] == account.email
+      assert params["X-Goog-Credential"] =~ account.email
 
       assert :public_key.verify(
-               Enum.join(["GET", "", "", expires, resource], "\n"),
+               TestGcp.v4_string_to_sign(params, account.email, resource),
                :sha256,
-               Base.decode64!(params["Signature"]),
+               Base.decode16!(params["X-Goog-Signature"], case: :lower),
                account.public_key
              )
     end

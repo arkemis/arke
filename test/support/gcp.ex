@@ -29,6 +29,53 @@ defmodule Arke.Test.Gcp do
   end
 
   @doc """
+  The string a v4 signed url's signature must verify against.
+
+  Rebuilt from the GCS specification rather than from `Arke.Utils.Gcp`, so an
+  encoding drift in either one fails the signature check.
+  """
+  def v4_string_to_sign(params, email, resource) do
+    date = params["X-Goog-Date"]
+    scope = "#{String.slice(date, 0, 8)}/auto/storage/goog4_request"
+
+    canonical_query =
+      [
+        {"X-Goog-Algorithm", "GOOG4-RSA-SHA256"},
+        {"X-Goog-Credential", "#{email}/#{scope}"},
+        {"X-Goog-Date", date},
+        {"X-Goog-Expires", params["X-Goog-Expires"]},
+        {"X-Goog-SignedHeaders", "host"}
+      ]
+      |> Enum.map_join("&", fn {k, v} -> "#{escape(k)}=#{escape(v)}" end)
+
+    canonical_request =
+      Enum.join(
+        [
+          "GET",
+          resource,
+          canonical_query,
+          "host:storage.googleapis.com",
+          "",
+          "host",
+          "UNSIGNED-PAYLOAD"
+        ],
+        "\n"
+      )
+
+    Enum.join(
+      [
+        "GOOG4-RSA-SHA256",
+        date,
+        scope,
+        Base.encode16(:crypto.hash(:sha256, canonical_request), case: :lower)
+      ],
+      "\n"
+    )
+  end
+
+  defp escape(value), do: URI.encode(value, &URI.char_unreserved?/1)
+
+  @doc """
   The recorded requests, keyed by case.
   """
   def request_fixtures() do
