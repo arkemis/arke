@@ -28,6 +28,16 @@ defmodule Arke.Utils.Gcp.Auth do
     4. `application_default_credentials.json` in the gcloud config dir
        (`$CLOUDSDK_CONFIG`, defaulting to `~/.config/gcloud`) — gcloud ADC
     5. the GCE metadata server
+
+  Signing takes whichever of those is resolved. Sources 1-3 normally carry a
+  private key and sign locally; the metadata server has none, so signing goes
+  through the IAM Credentials API, which needs the account to hold
+  `roles/iam.serviceAccountTokenCreator` on itself. gcloud ADC can sign the same
+  way but cannot name the account it would sign as, so it additionally needs:
+
+      config :arke, storage_signer_account: "signer@project.iam.gserviceaccount.com"
+
+  and the developer to hold `roles/iam.serviceAccountTokenCreator` on it.
   """
 
   @token_url "https://www.googleapis.com/oauth2/v4/token"

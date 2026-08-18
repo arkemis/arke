@@ -18,6 +18,10 @@ defmodule Arke.Utils.Gcp do
 
   Talks to the GCS JSON API over Req. The requests it builds are pinned by
   `test/support/fixtures/gcs_requests.exs`.
+
+  Signed urls use the V4 scheme and last `config :arke, :signed_url_ttl` seconds
+  (an hour by default, seven days at most), overridable per call with
+  `:expires_in`.
   """
   use Arke.Utils.FileStorage
   require Logger
