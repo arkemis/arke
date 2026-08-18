@@ -1,6 +1,8 @@
 defmodule Arke.Core.FileTest do
   use Arke.Test.RepoCase
 
+  alias Arke.Boundary.FileManager
+
   defmodule Storage do
     use Arke.Utils.FileStorage
 
@@ -125,6 +127,44 @@ defmodule Arke.Core.FileTest do
 
       assert_received {:signed_url, _path, opts}
       assert opts[:bucket] == nil
+    end
+  end
+
+  describe "signed url cache" do
+    setup do
+      project_with_bucket("project-bucket")
+      {:ok, unit} = create_file()
+      {:ok, unit: unit}
+    end
+
+    test "a live entry is served without signing again", %{unit: unit} do
+      assert {:ok, _} = Arke.Core.File.get_signed_url(unit)
+      assert_received {:signed_url, _path, _opts}
+
+      assert {:ok, %{signed_url: "https://signed"}} = Arke.Core.File.get_signed_url(unit)
+      refute_received {:signed_url, _path, _opts}
+    end
+
+    test "an entry inside the refresh margin is signed again", %{unit: unit} do
+      cache(unit, System.os_time(:second) + 60)
+
+      assert {:ok, _} = Arke.Core.File.get_signed_url(unit)
+
+      # Handing out a url about to expire breaks the download mid-flight.
+      assert_received {:signed_url, _path, _opts}
+    end
+
+    test "an entry shorter than the requested lifetime is signed again", %{unit: unit} do
+      cache(unit, System.os_time(:second) + 3600)
+
+      assert {:ok, _} = Arke.Core.File.get_signed_url(unit, expires_in: 86_400)
+
+      assert_received {:signed_url, _path, opts}
+      assert opts[:expires_in] == 86_400
+    end
+
+    defp cache(unit, expiration) do
+      FileManager.add(unit.id, unit.metadata.project, "https://cached", expiration)
     end
   end
 end

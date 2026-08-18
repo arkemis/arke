@@ -24,6 +24,8 @@ defmodule Arke.Core.File do
   alias Arke.QueryManager
   require Logger
 
+  @refresh_margin 300
+
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
 
   arke id: :arke_file do
@@ -130,20 +132,23 @@ defmodule Arke.Core.File do
     end
   end
 
-  def get_url(%{data: %{public: true} = data} = unit),
+  def get_url(unit, opts \\ [])
+
+  def get_url(%{data: %{public: true} = data} = unit, _opts),
     do: file_storage_module().get_public_url(unit, bucket: data[:bucket])
 
-  def get_url(unit), do: get_signed_url(unit)
+  def get_url(unit, opts), do: get_signed_url(unit, opts)
 
-  def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit) do
+  def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit, opts \\ []) do
     with %{signed_url: _signed_url, expiration: _expiration} = cached <-
            FileManager.get(unit_id, project),
-         {:ok, result} <- valid_data?(cached) do
+         {:ok, result} <- valid_data?(cached, opts) do
       {:ok, result}
     else
       _ ->
-        case file_storage_module().get_bucket_file_signed_url("#{data.path}/#{data.name}",
-               bucket: data[:bucket]
+        case file_storage_module().get_bucket_file_signed_url(
+               "#{data.path}/#{data.name}",
+               Keyword.put(opts, :bucket, data[:bucket])
              ) do
           {:ok, result} ->
             FileManager.add(unit, result)
@@ -155,14 +160,20 @@ defmodule Arke.Core.File do
     end
   end
 
-  defp valid_data?(%{signed_url: signed_url, expiration: expiration} = _runtime_data) do
-    case DateTime.compare(DateTime.from_unix!(expiration), DateTime.utc_now()) do
-      :gt -> {:ok, %{signed_url: signed_url, expiration: expiration}}
-      _ -> {:error, "expired url"}
+  # A url handed out moments before it expires breaks the download mid-flight,
+  # and one cached for less than the caller asked for is not what they asked
+  # for. Re-signing costs one call; both alternatives cost a failed request.
+  defp valid_data?(%{signed_url: signed_url, expiration: expiration}, opts) do
+    minimum = max(@refresh_margin, opts[:expires_in] || 0)
+
+    if expiration - System.os_time(:second) > minimum do
+      {:ok, %{signed_url: signed_url, expiration: expiration}}
+    else
+      {:error, "expired url"}
     end
   end
 
-  defp valid_data?(_runtime_data), do: {:error, "invalid data"}
+  defp valid_data?(_runtime_data, _opts), do: {:error, "invalid data"}
 
   defp is_public?(%{link_parameter: %{data: %{public: true}}}), do: true
   defp is_public?(_runtime_data), do: false
