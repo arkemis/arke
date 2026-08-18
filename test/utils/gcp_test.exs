@@ -92,6 +92,54 @@ defmodule Arke.Utils.GcpTest do
     end
   end
 
+  describe "get_bucket_file_signed_url/2 expiry" do
+    setup do
+      account = TestGcp.service_account()
+      stub(Auth, :signer_email, fn -> {:ok, account.email} end)
+      stub(Auth, :sign, fn _payload -> {:ok, {account.email, "signature"}} end)
+      on_exit(fn -> Application.delete_env(:arke, :signed_url_ttl) end)
+      :ok
+    end
+
+    test "defaults to an hour" do
+      assert expires_in(bucket: @bucket) == "3600"
+    end
+
+    test "takes the configured default" do
+      Application.put_env(:arke, :signed_url_ttl, 1_800)
+      assert expires_in(bucket: @bucket) == "1800"
+    end
+
+    test "the call overrides the configured default" do
+      Application.put_env(:arke, :signed_url_ttl, 1_800)
+      assert expires_in(bucket: @bucket, expires_in: 60) == "60"
+    end
+
+    test "expiration stays an absolute timestamp for the cache" do
+      assert {:ok, %{expiration: expiration}} =
+               Gcp.get_bucket_file_signed_url(@file_path, bucket: @bucket, expires_in: 60)
+
+      assert_in_delta expiration, DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(60), 5
+    end
+
+    test "(error) rejects a ttl beyond the seven day ceiling" do
+      assert {:error, [%{message: message}]} =
+               Gcp.get_bucket_file_signed_url(@file_path, bucket: @bucket, expires_in: 604_801)
+
+      assert message =~ "604800"
+    end
+
+    defp expires_in(opts) do
+      assert {:ok, %{signed_url: signed_url}} = Gcp.get_bucket_file_signed_url(@file_path, opts)
+
+      signed_url
+      |> URI.parse()
+      |> Map.fetch!(:query)
+      |> URI.decode_query()
+      |> Map.fetch!("X-Goog-Expires")
+    end
+  end
+
   describe "get_bucket_file_signed_url/2 without a signing key" do
     test "(error) fails when the credentials carry no private key" do
       stub(Auth, :signer_email, fn -> {:error, :no_private_key} end)

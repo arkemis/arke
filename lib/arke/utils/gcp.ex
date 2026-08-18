@@ -27,6 +27,8 @@ defmodule Arke.Utils.Gcp do
 
   @storage_base_url "https://storage.googleapis.com"
   @default_ttl 3600
+  # Fixed by the v4 scheme; GCS rejects anything longer at request time.
+  @max_ttl 604_800
 
   def upload_file(file_name, file_data, opts) do
     params =
@@ -67,10 +69,11 @@ defmodule Arke.Utils.Gcp do
   end
 
   @doc """
-  A V4 signed url for the object.
+  A V4 signed url for the object, valid for `:expires_in` seconds.
 
-  Signing is delegated to `Arke.Utils.Gcp.Auth.sign/1`, which uses the private
-  key when the credentials carry one and the IAM Credentials API otherwise.
+  Falls back to `config :arke, :signed_url_ttl` and then to an hour. Signing is
+  delegated to `Arke.Utils.Gcp.Auth.sign/1`, which uses the private key when the
+  credentials carry one and the IAM Credentials API otherwise.
   """
   def get_bucket_file_signed_url(file_path, opts) do
     if opts[:service_account] do
@@ -79,8 +82,17 @@ defmodule Arke.Utils.Gcp do
       )
     end
 
+    ttl = opts[:expires_in] || Application.get_env(:arke, :signed_url_ttl, @default_ttl)
+
+    if ttl > @max_ttl do
+      Error.create(:storage, "expires_in exceeds the #{@max_ttl} second v4 ceiling")
+    else
+      sign_url(file_path, ttl, opts)
+    end
+  end
+
+  defp sign_url(file_path, ttl, opts) do
     now = DateTime.utc_now()
-    ttl = @default_ttl
     resource = "/#{escape_path(bucket(opts))}/#{escape_path(file_path)}"
 
     # The signer's email is part of what gets signed, so it is resolved before
