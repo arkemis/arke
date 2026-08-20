@@ -25,6 +25,7 @@ defmodule Arke.Core.File do
   require Logger
 
   @refresh_margin 300
+  @default_ttl 3600
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
 
@@ -81,7 +82,7 @@ defmodule Arke.Core.File do
         {:ok, data}
 
       {:error, msg} ->
-        Logger.warning("error while loading the image: #{msg}")
+        Logger.warning("error while loading the image: #{inspect(msg)}")
         {:ok, data}
     end
   end
@@ -140,10 +141,12 @@ defmodule Arke.Core.File do
   def get_url(unit, opts), do: get_signed_url(unit, opts)
 
   def get_signed_url(%{data: data, id: unit_id, metadata: %{project: project}} = unit, opts \\ []) do
-    with %{signed_url: _signed_url, expiration: _expiration} = cached <-
+    ttl = opts[:expires_in] || Application.get_env(:arke, :signed_url_ttl, @default_ttl)
+
+    with %{signed_url: _signed_url, expiration: expiration} = cached <-
            FileManager.get(unit_id, project),
-         {:ok, result} <- valid_data?(cached, opts) do
-      {:ok, result}
+         true <- serves?(expiration, ttl) do
+      {:ok, cached}
     else
       _ ->
         case file_storage_module().get_bucket_file_signed_url(
@@ -161,19 +164,16 @@ defmodule Arke.Core.File do
   end
 
   # A url handed out moments before it expires breaks the download mid-flight,
-  # and one cached for less than the caller asked for is not what they asked
-  # for. Re-signing costs one call; both alternatives cost a failed request.
-  defp valid_data?(%{signed_url: signed_url, expiration: expiration}, opts) do
-    minimum = max(@refresh_margin, opts[:expires_in] || 0)
-
-    if expiration - System.os_time(:second) > minimum do
-      {:ok, %{signed_url: signed_url, expiration: expiration}}
-    else
-      {:error, "expired url"}
-    end
+  # and one signed for longer than this caller asked for is a lifetime they
+  # never requested, cached from whoever asked for it first. Both re-sign; the
+  # margin cannot outgrow the lifetime it trims, or nothing is ever cacheable.
+  defp serves?(expiration, ttl) when is_integer(ttl) and ttl > 0 do
+    remaining = expiration - System.os_time(:second)
+    remaining <= ttl and remaining > ttl - min(@refresh_margin, div(ttl, 2))
   end
 
-  defp valid_data?(_runtime_data, _opts), do: {:error, "invalid data"}
+  # A ttl the storage module will reject anyway: let it answer, not the cache.
+  defp serves?(_expiration, _ttl), do: false
 
   defp is_public?(%{link_parameter: %{data: %{public: true}}}), do: true
   defp is_public?(_runtime_data), do: false

@@ -138,10 +138,10 @@ defmodule Arke.Utils.Gcp.AuthTest do
       assert {:error, {400, %{"error" => "invalid_grant"}}} = Auth.token()
     end
 
-    test "sign/1 signs locally, making no request", %{account: account} do
+    test "sign/2 signs locally, making no request", %{account: account} do
       # Any request would raise: Req.Finch.run/1 has no stub in this test.
-      assert {:ok, {email, signature}} = Auth.sign(@payload)
-      assert email == account.email
+      assert Auth.signer_email() == {:ok, account.email}
+      assert {:ok, signature} = Auth.sign(@payload, account.email)
       assert :public_key.verify(@payload, :sha256, signature, account.public_key)
     end
   end
@@ -174,11 +174,11 @@ defmodule Arke.Utils.Gcp.AuthTest do
       assert params["client_secret"] == "secret"
     end
 
-    test "(error) sign/1 has no private key and no configured signer" do
-      assert Auth.sign(@payload) == {:error, :no_private_key}
+    test "(error) signer_email/0 has no private key and no configured signer" do
+      assert Auth.signer_email() == {:error, :no_private_key}
     end
 
-    test "sign/1 signs through IAM when a signer account is configured" do
+    test "sign/2 signs through IAM when a signer account is configured" do
       Application.put_env(
         :arke,
         :storage_signer_account,
@@ -193,8 +193,10 @@ defmodule Arke.Utils.Gcp.AuthTest do
          {200, ~s({"signedBlob":"#{Base.encode64("iam signature")}"}), "application/json"}}
       ])
 
-      assert Auth.sign(@payload) ==
-               {:ok, {"configured@project.iam.gserviceaccount.com", "iam signature"}}
+      assert Auth.signer_email() == {:ok, "configured@project.iam.gserviceaccount.com"}
+
+      assert Auth.sign(@payload, "configured@project.iam.gserviceaccount.com") ==
+               {:ok, "iam signature"}
 
       # No metadata lookup: a human's ADC cannot name itself, hence the config.
       assert_received {:request, _token}
@@ -217,7 +219,7 @@ defmodule Arke.Utils.Gcp.AuthTest do
       assert Req.Request.get_header(request, "metadata-flavor") == ["Google"]
     end
 
-    test "sign/1 signs through the IAM credentials API" do
+    test "sign/2 signs through the IAM credentials API" do
       signature = "iam produced this"
 
       stub_endpoints(
@@ -229,8 +231,10 @@ defmodule Arke.Utils.Gcp.AuthTest do
         ])
       )
 
-      assert Auth.sign(@payload) ==
-               {:ok, {"arke-dev-app@project.iam.gserviceaccount.com", signature}}
+      assert Auth.signer_email() == {:ok, "arke-dev-app@project.iam.gserviceaccount.com"}
+
+      assert Auth.sign(@payload, "arke-dev-app@project.iam.gserviceaccount.com") ==
+               {:ok, signature}
 
       requests = collect_requests()
       sign = Enum.find(requests, &(URI.to_string(&1.url) =~ @sign_blob_host))
@@ -252,13 +256,13 @@ defmodule Arke.Utils.Gcp.AuthTest do
       )
 
       assert {:error, {403, %{"error" => %{"status" => "PERMISSION_DENIED"}}}} =
-               Auth.sign(@payload)
+               Auth.sign(@payload, "arke-dev-app@project.iam.gserviceaccount.com")
     end
 
     test "(error) surfaces a non-200 from the metadata email lookup" do
       stub_endpoints(metadata_endpoints([{@metadata_email_url, {404, "", "text/plain"}}]))
 
-      assert {:error, {404, _}} = Auth.sign(@payload)
+      assert {:error, {404, _}} = Auth.signer_email()
     end
   end
 
@@ -275,8 +279,7 @@ defmodule Arke.Utils.Gcp.AuthTest do
 
     test "config json wins over the env var", %{account: account} do
       Application.put_env(:arke, :gcp_credentials, service_account_json(account))
-      assert {:ok, {email, _signature}} = Auth.sign(@payload)
-      assert email == account.email
+      assert_signs_as(account)
     end
 
     test "config accepts {:system, var}", %{account: account} do
@@ -285,8 +288,7 @@ defmodule Arke.Utils.Gcp.AuthTest do
 
       Application.put_env(:arke, :gcp_credentials, {:system, "ARKE_TEST_CREDENTIALS"})
 
-      assert {:ok, {email, _signature}} = Auth.sign(@payload)
-      assert email == account.email
+      assert_signs_as(account)
     end
 
     test "config accepts a decoded map", %{account: account} do
@@ -295,8 +297,13 @@ defmodule Arke.Utils.Gcp.AuthTest do
         "client_email" => account.email
       })
 
-      assert {:ok, {email, _signature}} = Auth.sign(@payload)
-      assert email == account.email
+      assert_signs_as(account)
+    end
+
+    defp assert_signs_as(account) do
+      assert Auth.signer_email() == {:ok, account.email}
+      assert {:ok, signature} = Auth.sign(@payload, account.email)
+      assert :public_key.verify(@payload, :sha256, signature, account.public_key)
     end
   end
 

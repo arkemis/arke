@@ -18,12 +18,17 @@ defmodule Arke.Core.FileTest do
 
     def get_bucket_file_signed_url(file_path, opts) do
       send(self(), {:signed_url, file_path, opts})
+      ttl = opts[:expires_in] || Application.get_env(:arke, :signed_url_ttl, 3600)
 
-      {:ok,
-       %{
-         signed_url: "https://signed",
-         expiration: DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(3600)
-       }}
+      {:ok, %{signed_url: "https://signed", expiration: System.os_time(:second) + ttl}}
+    end
+  end
+
+  defmodule FailingStorage do
+    use Arke.Utils.FileStorage
+
+    def get_bucket_file_signed_url(_file_path, _opts) do
+      {:error, [%{context: "storage", message: "boom"}]}
     end
   end
 
@@ -163,8 +168,61 @@ defmodule Arke.Core.FileTest do
       assert opts[:expires_in] == 86_400
     end
 
+    # A url signed for longer than this caller asked for is not the url this
+    # caller asked for: the shared entry cannot hand out a foreign lifetime.
+    test "an entry longer than the requested lifetime is signed again", %{unit: unit} do
+      cache(unit, System.os_time(:second) + 604_800)
+
+      assert {:ok, %{signed_url: "https://signed"}} = Arke.Core.File.get_signed_url(unit)
+
+      assert_received {:signed_url, _path, _opts}
+    end
+
+    test "a per-call lifetime is served from the cache on the second call", %{unit: unit} do
+      assert {:ok, _} = Arke.Core.File.get_signed_url(unit, expires_in: 600)
+      assert_received {:signed_url, _path, _opts}
+
+      assert {:ok, %{signed_url: "https://signed"}} =
+               Arke.Core.File.get_signed_url(unit, expires_in: 600)
+
+      refute_received {:signed_url, _path, _opts}
+    end
+
+    test "a configured lifetime shorter than the refresh margin still caches", %{unit: unit} do
+      Application.put_env(:arke, :signed_url_ttl, 120)
+      on_exit(fn -> Application.delete_env(:arke, :signed_url_ttl) end)
+
+      assert {:ok, _} = Arke.Core.File.get_signed_url(unit)
+      assert_received {:signed_url, _path, _opts}
+
+      assert {:ok, %{signed_url: "https://signed"}} = Arke.Core.File.get_signed_url(unit)
+      refute_received {:signed_url, _path, _opts}
+    end
+
     defp cache(unit, expiration) do
       FileManager.add(unit.id, unit.metadata.project, "https://cached", expiration)
+    end
+  end
+
+  describe "after_struct_encode/4" do
+    setup do
+      project_with_bucket("project-bucket")
+      {:ok, unit} = create_file()
+      {:ok, unit: unit}
+    end
+
+    test "attaches the signed url", %{unit: unit} do
+      assert {:ok, %{signed_url: "https://signed"}} =
+               Arke.Core.File.after_struct_encode(nil, unit, %{}, load_files: true)
+    end
+
+    # The error is only ever logged, so its shape must never decide whether a
+    # struct encodes: not every storage error is a string.
+    test "a storage error degrades to no signed url", %{unit: unit} do
+      Application.put_env(:arke, :file_storage_module, FailingStorage)
+
+      assert {:ok, data} = Arke.Core.File.after_struct_encode(nil, unit, %{}, load_files: true)
+      refute Map.has_key?(data, :signed_url)
     end
   end
 end

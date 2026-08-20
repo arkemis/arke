@@ -76,7 +76,7 @@ defmodule Arke.Utils.Gcp do
   A V4 signed url for the object, valid for `:expires_in` seconds.
 
   Falls back to `config :arke, :signed_url_ttl` and then to an hour. Signing is
-  delegated to `Arke.Utils.Gcp.Auth.sign/1`, which uses the private key when the
+  delegated to `Arke.Utils.Gcp.Auth.sign/2`, which uses the private key when the
   credentials carry one and the IAM Credentials API otherwise.
   """
   def get_bucket_file_signed_url(file_path, opts) do
@@ -88,10 +88,17 @@ defmodule Arke.Utils.Gcp do
 
     ttl = opts[:expires_in] || Application.get_env(:arke, :signed_url_ttl, @default_ttl)
 
-    if ttl > @max_ttl do
-      Error.create(:storage, "expires_in exceeds the #{@max_ttl} second v4 ceiling")
-    else
-      sign_url(file_path, ttl, opts)
+    # Callers render these into a log line and drop the url, so every branch
+    # answers a string like the signing failures in sign_url/3 do.
+    cond do
+      is_nil(bucket(opts)) ->
+        {:error, "no bucket to sign the url against"}
+
+      not (is_integer(ttl) and ttl > 0 and ttl <= @max_ttl) ->
+        {:error, "signed url lifetime must be 1..#{@max_ttl} seconds, got #{inspect(ttl)}"}
+
+      true ->
+        sign_url(file_path, ttl, opts)
     end
   end
 
@@ -99,12 +106,12 @@ defmodule Arke.Utils.Gcp do
     now = DateTime.utc_now()
     resource = "/#{escape_path(bucket(opts))}/#{escape_path(file_path)}"
 
-    # The signer's email is part of what gets signed, so it is resolved before
-    # the payload exists rather than read back off the signature.
+    # The signer's email is part of what gets signed, so it is resolved once,
+    # here, and handed to the signer rather than resolved again inside it.
     with {:ok, client_email} <- Auth.signer_email(),
          params <- signing_params(client_email, now, ttl),
          string_to_sign <- string_to_sign(resource, params, now),
-         {:ok, {_email, signature}} <- Auth.sign(string_to_sign) do
+         {:ok, signature} <- Auth.sign(string_to_sign, client_email) do
       qs =
         params
         |> Map.put("X-Goog-Signature", Base.encode16(signature, case: :lower))

@@ -17,7 +17,7 @@ defmodule Arke.Utils.Gcp.Auth do
   Google credentials for `Arke.Utils.Gcp`.
 
   Resolves application default credentials, then either mints an OAuth access
-  token (`token/0`) or signs a payload (`sign/1`).
+  token (`token/0`) or signs a payload (`sign/2`).
 
   Credentials are resolved on every call, first hit wins:
 
@@ -57,23 +57,25 @@ defmodule Arke.Utils.Gcp.Auth do
   end
 
   @doc """
-  Signs `payload`, returning `{signer_email, signature}` with the raw signature
-  bytes — callers encode them as their url scheme requires.
+  Signs `payload` as `email`, returning the raw signature bytes — callers encode
+  them as their url scheme requires.
+
+  V4 signing embeds the signer in the payload, so the caller resolves it with
+  `signer_email/0` and passes it back here: resolving it twice risks signing as
+  one account under a url that names another.
 
   Service account credentials sign locally. Under Workload Identity there is no
   private key, so the IAM Credentials API signs on our behalf. gcloud user
   credentials can do the same, but cannot name the account they would be signing
   as, so they need `config :arke, :storage_signer_account`.
   """
-  def sign(payload) do
-    with {:ok, email} <- signer_email() do
-      case credentials() do
-        {:ok, %{"private_key" => pem}} ->
-          {:ok, {email, :public_key.sign(payload, :sha256, private_key(pem))}}
+  def sign(payload, email) do
+    case credentials() do
+      {:ok, %{"private_key" => pem}} ->
+        {:ok, :public_key.sign(payload, :sha256, private_key(pem))}
 
-        _ ->
-          sign_blob(email, payload)
-      end
+      _ ->
+        sign_blob(email, payload)
     end
   end
 
@@ -116,7 +118,7 @@ defmodule Arke.Utils.Gcp.Auth do
              retry: :transient
            ),
          {:ok, signature} <- Base.decode64(signature) do
-      {:ok, {email, signature}}
+      {:ok, signature}
     else
       {:ok, %{status: status, body: body}} -> {:error, {status, body}}
       :error -> {:error, :invalid_signature}
