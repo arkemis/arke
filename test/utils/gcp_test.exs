@@ -95,6 +95,7 @@ defmodule Arke.Utils.GcpTest do
     # metadata round trip and a chance to sign as someone else.
     test "resolves the signer once and signs as the account it embedded", %{account: account} do
       parent = self()
+
       stub(Auth, :signer_email, fn ->
         send(parent, :resolved)
         {:ok, account.email}
@@ -112,6 +113,7 @@ defmodule Arke.Utils.GcpTest do
       refute_received :resolved
 
       assert_received {:signed_as, email}
+
       assert URI.parse(signed_url).query |> URI.decode_query() |> Map.fetch!("X-Goog-Credential") =~
                email
     end
