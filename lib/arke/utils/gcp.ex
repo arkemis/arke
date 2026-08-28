@@ -18,6 +18,10 @@ defmodule Arke.Utils.Gcp do
 
   Talks to the GCS JSON API over Req. The requests it builds are pinned by
   `test/support/fixtures/gcs_requests.exs`.
+
+  Signed urls use the V4 scheme and last `config :arke, :signed_url_ttl` seconds
+  (an hour by default, seven days at most), overridable per call with
+  `:expires_in`.
   """
   use Arke.Utils.FileStorage
   require Logger
@@ -26,6 +30,9 @@ defmodule Arke.Utils.Gcp do
   alias Arke.Utils.Gcp.Auth
 
   @storage_base_url "https://storage.googleapis.com"
+  @default_ttl 3600
+  # Fixed by the v4 scheme; GCS rejects anything longer at request time.
+  @max_ttl 604_800
 
   def upload_file(file_name, file_data, opts) do
     params =
@@ -66,10 +73,11 @@ defmodule Arke.Utils.Gcp do
   end
 
   @doc """
-  A V2 signed url for the object, signed with the service account key.
+  A V4 signed url for the object, valid for `:expires_in` seconds.
 
-  Requires service account credentials: metadata server and gcloud user
-  credentials have no private key to sign with.
+  Falls back to `config :arke, :signed_url_ttl` and then to an hour. Signing is
+  delegated to `Arke.Utils.Gcp.Auth.sign/2`, which uses the private key when the
+  credentials carry one and the IAM Credentials API otherwise.
   """
   def get_bucket_file_signed_url(file_path, opts) do
     if opts[:service_account] do
@@ -78,36 +86,105 @@ defmodule Arke.Utils.Gcp do
       )
     end
 
-    expires = DateTime.utc_now() |> DateTime.to_unix() |> Kernel.+(1 * 3600)
-    resource = "/#{bucket(opts)}/#{URI.encode(file_path)}"
-    string_to_sign = ["GET", "", "", expires, resource] |> Enum.join("\n")
+    ttl = opts[:expires_in] || Application.get_env(:arke, :signed_url_ttl, @default_ttl)
 
-    case Auth.signer() do
-      {:ok, {client_email, pem}} ->
-        signature =
-          string_to_sign
-          |> :public_key.sign(:sha256, Auth.private_key(pem))
-          |> Base.encode64()
+    # Callers render these into a log line and drop the url, so every branch
+    # answers a string like the signing failures in sign_url/3 do.
+    cond do
+      is_nil(bucket(opts)) ->
+        {:error, "no bucket to sign the url against"}
 
-        qs =
-          %{
-            "GoogleAccessId" => client_email,
-            "Expires" => expires,
-            "Signature" => signature
-          }
-          |> URI.encode_query()
+      not (is_integer(ttl) and ttl > 0 and ttl <= @max_ttl) ->
+        {:error, "signed url lifetime must be 1..#{@max_ttl} seconds, got #{inspect(ttl)}"}
 
-        {:ok,
-         %{
-           signed_url: Enum.join(["#{@storage_base_url}#{resource}", "?", qs]),
-           expiration: expires
-         }}
+      true ->
+        sign_url(file_path, ttl, opts)
+    end
+  end
 
+  defp sign_url(file_path, ttl, opts) do
+    now = DateTime.utc_now()
+    resource = "/#{escape_path(bucket(opts))}/#{escape_path(file_path)}"
+
+    # The signer's email is part of what gets signed, so it is resolved once,
+    # here, and handed to the signer rather than resolved again inside it.
+    with {:ok, client_email} <- Auth.signer_email(),
+         params <- signing_params(client_email, now, ttl),
+         string_to_sign <- string_to_sign(resource, params, now),
+         {:ok, signature} <- Auth.sign(string_to_sign, client_email) do
+      qs =
+        params
+        |> Map.put("X-Goog-Signature", Base.encode16(signature, case: :lower))
+        |> URI.encode_query()
+
+      {:ok,
+       %{
+         signed_url: Enum.join(["#{@storage_base_url}#{resource}", "?", qs]),
+         expiration: DateTime.to_unix(now) + ttl
+       }}
+    else
       {:error, reason} ->
         Logger.warning("error on gcp signed url: #{inspect(reason)}")
         {:error, "error on signed url"}
     end
   end
+
+  defp signing_params(client_email, now, ttl) do
+    %{
+      "X-Goog-Algorithm" => "GOOG4-RSA-SHA256",
+      "X-Goog-Credential" => "#{client_email}/#{credential_scope(now)}",
+      "X-Goog-Date" => goog_date(now),
+      "X-Goog-Expires" => ttl,
+      "X-Goog-SignedHeaders" => "host"
+    }
+  end
+
+  # Every byte here has to match what the client will send, or GCS answers
+  # SignatureDoesNotMatch with no indication of which byte differed.
+  defp string_to_sign(resource, params, now) do
+    canonical_request =
+      Enum.join(
+        [
+          "GET",
+          resource,
+          canonical_query(params),
+          "host:#{URI.parse(@storage_base_url).host}",
+          "",
+          "host",
+          "UNSIGNED-PAYLOAD"
+        ],
+        "\n"
+      )
+
+    Enum.join(
+      [
+        "GOOG4-RSA-SHA256",
+        goog_date(now),
+        credential_scope(now),
+        hex(:crypto.hash(:sha256, canonical_request))
+      ],
+      "\n"
+    )
+  end
+
+  defp canonical_query(params) do
+    params
+    |> Enum.sort()
+    |> Enum.map_join("&", fn {name, value} ->
+      "#{escape(name)}=#{escape(to_string(value))}"
+    end)
+  end
+
+  defp credential_scope(now), do: "#{Calendar.strftime(now, "%Y%m%d")}/auto/storage/goog4_request"
+
+  defp goog_date(now), do: Calendar.strftime(now, "%Y%m%dT%H%M%SZ")
+
+  defp escape(value), do: URI.encode(value, &URI.char_unreserved?/1)
+
+  # Separators stay separators; everything inside a segment is escaped.
+  defp escape_path(path), do: path |> String.split("/") |> Enum.map_join("/", &escape/1)
+
+  defp hex(binary), do: Base.encode16(binary, case: :lower)
 
   # Req retries safe requests by default; keep every call one-shot and bounded.
   defp request(opts) do
