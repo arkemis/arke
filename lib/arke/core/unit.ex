@@ -44,7 +44,7 @@ defmodule Arke.Core.Unit do
           data: data,
           arke_id: arke_id,
           link: link,
-          metadata: metadata,
+          metadata: normalize_metadata(metadata),
           inserted_at: DatetimeHandler.parse_datetime(inserted_at, true),
           updated_at: DatetimeHandler.parse_datetime(updated_at, true),
           __module__: module,
@@ -52,6 +52,26 @@ defmodule Arke.Core.Unit do
         )
     end
   end
+
+  defp normalize_metadata(nil), do: nil
+
+  defp normalize_metadata(metadata) when is_map(metadata) do
+    {atoms, strings} = Map.split_with(metadata, fn {key, _value} -> is_atom(key) end)
+
+    strings
+    |> Map.new(fn {key, value} -> {existing_atom(key), value} end)
+    |> Map.merge(atoms)
+  end
+
+  defp normalize_metadata(metadata), do: metadata
+
+  defp existing_atom(key) when is_binary(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
+
+  defp existing_atom(key), do: key
 
   defp check_id(id) when is_binary(id), do: String.to_atom(id)
   defp check_id(id) when is_atom(id), do: id
@@ -198,6 +218,7 @@ defmodule Arke.Core.Unit do
 
     parsed_data =
       Enum.reduce(new_data, %{}, fn {parameter_id, value}, final_unit_data ->
+        parameter_id = existing_atom(parameter_id)
         new_value = parse_value(value, ArkeManager.get_parameter(arke, project, parameter_id))
         Map.put(final_unit_data, parameter_id, new_value)
       end)
