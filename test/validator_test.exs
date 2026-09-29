@@ -101,6 +101,48 @@ defmodule Arke.ValidatorTest do
                {"not_valid", [{"Default", "must be a float"}]}
     end
 
+    test "numeric strings are parsed whole or not at all" do
+      arke = ArkeManager.get(:integer, :arke_system)
+      integer = ParameterManager.get(:default_integer, :arke_system)
+      float = ParameterManager.get(:default_float, :arke_system)
+
+      assert Arke.Validator.validate_parameter(arke, integer, "12", :test_schema) == {12, []}
+      assert Arke.Validator.validate_parameter(arke, float, "1.5", :test_schema) == {1.5, []}
+
+      assert Arke.Validator.validate_parameter(arke, integer, "12abc", :test_schema) ==
+               {"12abc", [{"Default", "must be an integer"}]}
+
+      assert Arke.Validator.validate_parameter(arke, float, "1.5e", :test_schema) ==
+               {"1.5e", [{"Default", "must be a float"}]}
+    end
+
+    test "partial numbers are rejected on create" do
+      arke = ArkeManager.get(:arke_test_support, :arke_system)
+      base = %{enum_integer_support: [1]}
+
+      assert {:ok, unit} =
+               QueryManager.create(:test_schema, arke, Map.put(base, :integer_support, " 12 "))
+
+      assert unit.data.integer_support == 12
+
+      assert {:error, errors} =
+               QueryManager.create(:test_schema, arke, Map.put(base, :integer_support, "12abc"))
+
+      assert %{message: "integer_support: must be an integer", context: "parameter_validation"} in errors
+    end
+
+    test "non-string values of the wrong type are reported, not raised" do
+      arke = ArkeManager.get(:integer, :arke_system)
+      integer = ParameterManager.get(:default_integer, :arke_system)
+      float = ParameterManager.get(:default_float, :arke_system)
+
+      assert Arke.Validator.validate_parameter(arke, integer, 1.5, :test_schema) ==
+               {1.5, [{"Default", "must be an integer"}]}
+
+      assert Arke.Validator.validate_parameter(arke, float, true, :test_schema) ==
+               {true, [{"Default", "must be a float"}]}
+    end
+
     test "boolean" do
       arke_boolean = ArkeManager.get(:boolean, :arke_system)
       parameter = ParameterManager.get(:default_boolean, :arke_system)

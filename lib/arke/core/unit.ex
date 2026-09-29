@@ -363,25 +363,18 @@ defmodule Arke.Core.Unit do
     _cleaned_list = list_result |> Enum.map(&String.replace(&1, ~r/^['"]|['"]$/, ""))
   end
 
+  # only a whole numeric string is converted; anything else is kept so the validator reports it
   defp parse_value(value, %{arke_id: :integer}) when is_binary(value) do
-    case Integer.parse(value) do
-      {number, _rest} ->
-        number
-
-      :error ->
-        {:error, msg} = Error.create(:validation, "invalid integer")
-        msg
+    case Integer.parse(String.trim(value)) do
+      {number, ""} -> number
+      _ -> value
     end
   end
 
   defp parse_value(value, %{arke_id: :float}) when is_binary(value) do
-    case Float.parse(value) do
-      {number, _rest} ->
-        number
-
-      :error ->
-        {:error, msg} = Error.create(:validation, "invalid float")
-        msg
+    case Float.parse(String.trim(value)) do
+      {number, ""} -> number
+      _ -> value
     end
   end
 
