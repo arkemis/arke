@@ -509,6 +509,55 @@ defmodule Arke.ValidatorTest do
     end
   end
 
+  describe "strip and lowercase" do
+    defp label_with(flag) do
+      p = ParameterManager.get(:label, :arke_system)
+      # no length limits: check_min_length/max_length do not handle lists
+      %{
+        p
+        | data:
+            Map.merge(p.data, %{flag => true, required: false, min_length: nil, max_length: nil})
+      }
+    end
+
+    defp validate(parameter, value),
+      do:
+        Arke.Validator.validate_parameter(
+          ArkeManager.get(:string, :arke_system),
+          parameter,
+          value,
+          :test_schema
+        )
+
+    test "strip trims and dashes a string" do
+      assert {"a-b", []} = validate(label_with(:strip), "  a  b ")
+    end
+
+    test "strip and lowercase apply to each string of a list" do
+      assert {["a-b", "c"], _} = validate(label_with(:strip), [" a b ", "c"])
+      assert {["ab", "cd"], _} = validate(label_with(:lowercase), ["AB", "Cd"])
+    end
+
+    test "an atom is kept when the result exists, else becomes a string" do
+      assert {:test_schema, []} = validate(label_with(:lowercase), :TEST_SCHEMA)
+      name = "New Atom #{System.unique_integer([:positive])}"
+      assert {"New-Atom-" <> _, []} = validate(label_with(:strip), String.to_atom(name))
+      assert_raise ArgumentError, fn -> String.to_existing_atom(String.downcase(name)) end
+      assert {lowered, []} = validate(label_with(:lowercase), String.to_atom(name))
+      assert lowered == String.downcase(name)
+    end
+
+    test "a non-text value is left to the type check instead of raising" do
+      assert {12, [{_, "must be a string"}]} = validate(label_with(:strip), 12)
+      assert {12, [{_, "must be a string"}]} = validate(label_with(:lowercase), 12)
+    end
+
+    test "nil is not turned into a string" do
+      assert {nil, []} = validate(label_with(:strip), nil)
+      assert {nil, []} = validate(label_with(:lowercase), nil)
+    end
+  end
+
   describe "default_values" do
     test "string" do
       # Create string
