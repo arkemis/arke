@@ -25,7 +25,7 @@ defmodule Arke.Utils.DatetimeHandler do
   @date_msg "must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format"
 
   @time_msg "must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format"
-  @general_msg " values must be %Date{} | ~D[YYYY-MM-DD]| %DateTime{} | %NaiveDateTime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]"
+  @general_msg "values must be %Date{} | ~D[YYYY-MM-DD] | %DateTime{} | %NaiveDateTime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS] | two %Time{} | ~T[HH:MM:SS] | :now"
 
   @utc "Etc/UTC"
   @clock_units [:hours, :minutes, :seconds]
@@ -126,28 +126,79 @@ defmodule Arke.Utils.DatetimeHandler do
 
   # ----- COMPARISON -----
 
-  def after?(first_date, second_date) do
-    case compare(first_date, second_date) do
-      :error -> @general_msg
-      result -> result == :gt
-    end
-  end
+  @typedoc "A value `compare/2` accepts."
+  @type comparable ::
+          Date.t() | Time.t() | DateTime.t() | NaiveDateTime.t() | String.t() | :now
 
-  def before?(first_date, second_date) do
-    case compare(first_date, second_date) do
-      :error -> @general_msg
-      result -> result == :lt
-    end
-  end
+  @doc """
+  Compares two temporal values and returns `:lt`, `:eq` or `:gt`, or
+  `{:error, message}` when they cannot be compared.
 
-  defp compare(first, second) do
+  Dates, datetimes, naive datetimes and ISO 8601 strings are compared as UTC
+  datetimes, a date counting as its midnight. A time is compared only with another
+  time (a `%Time{}` or an ISO 8601 time string).
+
+  Either side can be `:now`, taken in the type of the other side: today for a
+  date, the current time for a time, the current datetime otherwise.
+
+      iex> DatetimeHandler.compare(~D[2024-03-05], ~D[2024-03-06])
+      :lt
+      iex> DatetimeHandler.compare(~U[2024-03-05 00:00:00Z], ~D[2024-03-05])
+      :eq
+      iex> DatetimeHandler.compare(~T[10:00:00], "09:30:00")
+      :gt
+  """
+  @spec compare(comparable(), comparable()) :: :lt | :eq | :gt | {:error, String.t()}
+  def compare(first, second)
+  def compare(:now, second), do: compare(now_like(second), second)
+  def compare(first, :now), do: compare(first, now_like(first))
+  def compare(%Time{} = first, second), do: compare_times(first, second)
+  def compare(first, %Time{} = second), do: compare_times(first, second)
+
+  def compare(first, second) do
     with {:ok, first} <- to_datetime(first),
          {:ok, second} <- to_datetime(second) do
       DateTime.compare(first, second)
     else
-      _ -> :error
+      _ -> {:error, @general_msg}
     end
   end
+
+  @doc """
+  Returns `true` when `first` is strictly after `second`, like `DateTime.after?/2`.
+  Takes the same values as `compare/2` and raises `ArgumentError` when they
+  cannot be compared.
+  """
+  @spec after?(comparable(), comparable()) :: boolean()
+  def after?(first, second), do: compare!(first, second) == :gt
+
+  @doc """
+  Returns `true` when `first` is strictly before `second`, like `DateTime.before?/2`.
+  Takes the same values as `compare/2` and raises `ArgumentError` when they
+  cannot be compared.
+  """
+  @spec before?(comparable(), comparable()) :: boolean()
+  def before?(first, second), do: compare!(first, second) == :lt
+
+  defp compare!(first, second) do
+    case compare(first, second) do
+      {:error, message} -> raise ArgumentError, message
+      result -> result
+    end
+  end
+
+  defp compare_times(first, second) do
+    with {:ok, %Time{} = first} <- parse_time(first),
+         {:ok, %Time{} = second} <- parse_time(second) do
+      Time.compare(first, second)
+    else
+      _ -> {:error, @general_msg}
+    end
+  end
+
+  defp now_like(%Date{}), do: now(:date)
+  defp now_like(%Time{}), do: now(:time)
+  defp now_like(_value), do: now(:datetime)
 
   defp wrap(value, true), do: value
   defp wrap(value, _only_value), do: {:ok, value}

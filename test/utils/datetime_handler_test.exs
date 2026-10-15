@@ -3,10 +3,12 @@ defmodule Arke.Utils.DatetimeHandlerTest do
 
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
 
+  doctest Arke.Utils.DatetimeHandler, only: [compare: 2]
+
   @datetime_msg "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
   @date_msg "must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format"
   @time_msg "must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format"
-  @general_msg " values must be %Date{} | ~D[YYYY-MM-DD]| %DateTime{} | %NaiveDateTime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]"
+  @general_msg "values must be %Date{} | ~D[YYYY-MM-DD] | %DateTime{} | %NaiveDateTime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS] | two %Time{} | ~T[HH:MM:SS] | :now"
 
   describe "now/1" do
     test "returns a second-precision UTC datetime" do
@@ -328,10 +330,61 @@ defmodule Arke.Utils.DatetimeHandlerTest do
       assert DatetimeHandler.after?(@earlier, ~D[2024-03-05]) == true
     end
 
-    test "returns a bare message string for invalid input" do
-      assert DatetimeHandler.after?("garbage", @earlier) == @general_msg
-      assert DatetimeHandler.after?(nil, nil) == @general_msg
-      assert DatetimeHandler.before?(nil, nil) == @general_msg
+    test "raise ArgumentError with the message for invalid input" do
+      assert_raise ArgumentError, @general_msg, fn ->
+        DatetimeHandler.after?("garbage", @earlier)
+      end
+
+      assert_raise ArgumentError, @general_msg, fn -> DatetimeHandler.after?(nil, nil) end
+      assert_raise ArgumentError, @general_msg, fn -> DatetimeHandler.before?(nil, nil) end
+
+      assert_raise ArgumentError, @general_msg, fn ->
+        DatetimeHandler.before?(~T[10:00:00], ~D[2024-03-05])
+      end
+    end
+
+    test "compare times" do
+      assert DatetimeHandler.after?(~T[11:00:00], ~T[10:00:00]) == true
+      assert DatetimeHandler.before?(~T[11:00:00], "10:00:00") == false
+    end
+
+    test "accept :now" do
+      assert DatetimeHandler.after?(:now, @earlier) == true
+      assert DatetimeHandler.before?(@earlier, :now) == true
+    end
+  end
+
+  describe "compare/2" do
+    test "orders dates, datetimes, naive datetimes and ISO strings" do
+      assert DatetimeHandler.compare(~D[2024-03-05], ~D[2024-03-06]) == :lt
+      assert DatetimeHandler.compare(~U[2024-03-05 10:00:00Z], ~N[2024-03-05 10:00:00]) == :eq
+      assert DatetimeHandler.compare("2024-03-06T00:00:00Z", ~D[2024-03-05]) == :gt
+    end
+
+    test "a date counts as its midnight against a datetime" do
+      assert DatetimeHandler.compare(~D[2024-03-05], ~U[2024-03-05 00:00:00Z]) == :eq
+      assert DatetimeHandler.compare(~D[2024-03-05], ~U[2024-03-05 00:00:01Z]) == :lt
+    end
+
+    test "orders times, also against a time string" do
+      assert DatetimeHandler.compare(~T[10:00:00], ~T[11:00:00]) == :lt
+      assert DatetimeHandler.compare(~T[10:00:00], "10:00:00") == :eq
+      assert DatetimeHandler.compare("12:00:00", ~T[10:00:00]) == :gt
+    end
+
+    test ":now takes the type of the other side" do
+      assert DatetimeHandler.compare(Date.utc_today(), :now) == :eq
+      assert DatetimeHandler.compare(:now, Date.add(Date.utc_today(), 1)) == :lt
+      assert DatetimeHandler.compare(~T[00:00:00], :now) in [:lt, :eq]
+      assert DatetimeHandler.compare(~U[2000-01-01 00:00:00Z], :now) == :lt
+    end
+
+    test "returns an error tuple when the values cannot be compared" do
+      assert DatetimeHandler.compare(~T[10:00:00], ~D[2024-03-05]) == {:error, @general_msg}
+      assert DatetimeHandler.compare(~D[2024-03-05], ~T[10:00:00]) == {:error, @general_msg}
+      assert DatetimeHandler.compare(~T[10:00:00], nil) == {:error, @general_msg}
+      assert DatetimeHandler.compare("garbage", ~D[2024-03-05]) == {:error, @general_msg}
+      assert DatetimeHandler.compare(nil, :now) == {:error, @general_msg}
     end
   end
 end
