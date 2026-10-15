@@ -128,7 +128,7 @@ defmodule Arke.Core.Query do
     defp cast_temporal(parser, value, type) do
       case parser.(value) do
         {:ok, parsed} -> parsed
-        _ -> raise ArgumentError, message: "Invalid #{type} format"
+        _ -> invalid!(type)
       end
     end
 
@@ -137,7 +137,7 @@ defmodule Arke.Core.Query do
     defp cast_integer(value) when is_binary(value) do
       case Integer.parse(value) do
         {parsed, _remainder} -> parsed
-        :error -> raise ArgumentError, message: "Invalid integer format"
+        :error -> invalid!("integer")
       end
     end
 
@@ -148,7 +148,7 @@ defmodule Arke.Core.Query do
     defp cast_float(value) when is_binary(value) do
       case Float.parse(value) do
         {parsed, _remainder} -> parsed
-        :error -> raise ArgumentError, message: "Invalid float format"
+        :error -> invalid!("float")
       end
     end
 
@@ -157,7 +157,9 @@ defmodule Arke.Core.Query do
     defp cast_boolean(value) when is_boolean(value), do: value
     defp cast_boolean(value) when value in ["true", "True", 1, "1"], do: true
     defp cast_boolean(value) when value in ["false", "False", 0, "0"], do: false
-    defp cast_boolean(_value), do: raise(ArgumentError, message: "Invalid boolean format")
+    defp cast_boolean(_value), do: invalid!("boolean")
+
+    defp invalid!(type), do: raise(Arke.InvalidValueError, "Invalid #{type} format")
   end
 
   defmodule Order do

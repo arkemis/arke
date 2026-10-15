@@ -206,8 +206,13 @@ defmodule Arke.Core.QueryTest do
     end
 
     test "raises on temporal values that cannot be cast" do
-      assert_raise ArgumentError, fn -> filter_value(:default_time, "not a time") end
-      assert_raise ArgumentError, fn -> filter_value(:default_datetime, "not a datetime") end
+      assert_raise Arke.InvalidValueError, "Invalid time format", fn ->
+        filter_value(:default_time, "not a time")
+      end
+
+      assert_raise Arke.InvalidValueError, "Invalid datetime format", fn ->
+        filter_value(:default_datetime, "not a datetime")
+      end
     end
 
     test "passes nil through for every type" do
@@ -217,10 +222,24 @@ defmodule Arke.Core.QueryTest do
     end
 
     test "raises on values that cannot be cast" do
-      assert_raise ArgumentError, fn -> filter_value(:default_integer, "not a number") end
-      assert_raise ArgumentError, fn -> filter_value(:default_float, "not a number") end
-      assert_raise ArgumentError, fn -> filter_value(:default_boolean, "maybe") end
-      assert_raise ArgumentError, fn -> filter_value(:default_date, "not a date") end
+      for {id, type} <- [default_integer: "integer", default_float: "float", default_date: "date"] do
+        assert_raise Arke.InvalidValueError, "Invalid #{type} format", fn ->
+          filter_value(id, "not valid")
+        end
+      end
+
+      assert_raise Arke.InvalidValueError, "Invalid boolean format", fn ->
+        filter_value(:default_boolean, "maybe")
+      end
+    end
+
+    test "raises on a list with a value that cannot be cast" do
+      assert_raise Arke.InvalidValueError, fn -> filter_value(:default_integer, ["1", "x"]) end
+    end
+
+    test "invalid values map to HTTP 400" do
+      error = catch_error(filter_value(:default_integer, "not valid"))
+      assert error.plug_status == 400
     end
 
     test "casts without a parameter by leaving the value untouched" do

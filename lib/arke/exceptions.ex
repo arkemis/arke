@@ -15,3 +15,8 @@
 defmodule ParameterError do
   defexception message: "Invalid Parameter"
 end
+
+defmodule Arke.InvalidValueError do
+  @moduledoc "A value that does not fit its parameter type. Plug maps it to 400."
+  defexception [:message, plug_status: 400]
+end
