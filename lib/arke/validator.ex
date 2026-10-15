@@ -427,34 +427,36 @@ defmodule Arke.Validator do
   defp check_multiple(errors, _parameter, _value), do: errors
   # --- end Multiple ---
 
-  defp check_whitespace(%{data: %{strip: true}} = _parameter, value) when is_atom(value) do
-    value
-    |> Atom.to_string()
-    |> String.trim()
-    |> String.replace(~r/\s+/, "-")
-    |> String.to_existing_atom()
-  end
-
-  defp check_whitespace(%{data: %{strip: true}} = _parameter, value) do
-    value |> String.trim() |> String.replace(~r/\s+/, "-")
-  end
+  defp check_whitespace(%{data: %{strip: true}} = _parameter, value),
+    do: transform_text(value, &(&1 |> String.trim() |> String.replace(~r/\s+/, "-")))
 
   defp check_whitespace(_, value),
     do: value
 
-  defp check_lowercase(%{data: %{lowercase: true}} = _parameter, value) when is_atom(value) do
-    value
-    |> Atom.to_string()
-    |> String.downcase()
-    |> String.to_atom()
-  end
-
-  defp check_lowercase(%{data: %{lowercase: true}} = _parameter, value) do
-    value |> String.downcase()
-  end
+  defp check_lowercase(%{data: %{lowercase: true}} = _parameter, value),
+    do: transform_text(value, &String.downcase/1)
 
   defp check_lowercase(_, value),
     do: value
+
+  # Only text is transformed; any other value is left for check_by_type to reject.
+  defp transform_text(value, fun) when is_binary(value), do: fun.(value)
+
+  defp transform_text(value, fun) when is_list(value),
+    do: Enum.map(value, &transform_text(&1, fun))
+
+  defp transform_text(value, fun) when is_atom(value) and value not in [nil, true, false] do
+    text = value |> Atom.to_string() |> fun.()
+
+    # Never create atoms from input: keep the string when the atom does not exist.
+    try do
+      String.to_existing_atom(text)
+    rescue
+      ArgumentError -> text
+    end
+  end
+
+  defp transform_text(value, _fun), do: value
 
   defp check_max_length(errors, %{data: %{max_length: max_length}} = _parameter, _)
        when is_nil(max_length),
