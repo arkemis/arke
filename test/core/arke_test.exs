@@ -29,6 +29,28 @@ defmodule Arke.Core.ArkeTest do
                String.downcase(edit_arke.data.label) == "test arke modificato"
     end
 
+    test "edit Arke keeps the manager's parameters and module" do
+      arke_model = ArkeManager.get(:arke, :arke_system)
+      QueryManager.create(:test_schema, arke_model, %{id: "test", label: "Test Arke"})
+
+      old_arke = ArkeManager.get(:test, :test_schema)
+      assert old_arke.data.parameters != []
+
+      # A unit loaded from persistence, as arke_server does, has no parameters or module.
+      db_arke =
+        QueryManager.query(project: :test_schema, arke: :arke)
+        |> QueryManager.where(id: "test")
+        |> QueryManager.one()
+
+      {:ok, _} = QueryManager.update(db_arke, %{label: "Renamed", active: false})
+
+      arke = ArkeManager.get(:test, :test_schema)
+      assert arke.data.label == "Renamed"
+      assert arke.data.active == false
+      assert arke.data.parameters == old_arke.data.parameters
+      assert arke.__module__ == old_arke.__module__
+    end
+
     test "edit Arke (error)" do
       arke_model = ArkeManager.get(:arke, :arke_system)
       QueryManager.create(:test_schema, arke_model, %{id: "test", label: "Test Arke"})
