@@ -29,6 +29,33 @@ defmodule Arke.Core.GroupTest do
       assert Enum.map(members, & &1.id) == [:arke_test_support]
     end
 
+    test "update from a persisted unit keeps the manager's module and arke_list" do
+      QueryManager.create(:test_schema, ArkeManager.get(:arke, :arke_system), %{
+        id: "group_member",
+        label: "Group Member"
+      })
+
+      QueryManager.create(:test_schema, ArkeManager.get(:group, :arke_system), %{
+        id: "group_update",
+        label: "Group",
+        arke_list: ["group_member"]
+      })
+
+      old_group = GroupManager.get(:group_update, :test_schema)
+
+      db_group =
+        QueryManager.query(project: :test_schema, arke: :group)
+        |> QueryManager.where(id: "group_update")
+        |> QueryManager.one()
+
+      {:ok, _} = QueryManager.update(db_group, %{label: "Renamed"})
+
+      group = GroupManager.get(:group_update, :test_schema)
+      assert group.data.label == "Renamed"
+      assert group.__module__ == old_group.__module__
+      assert Enum.map(group.data.arke_list, & &1.id) == [:group_member]
+    end
+
     test "delete" do
       group_model = ArkeManager.get(:group, :arke_system)
 
