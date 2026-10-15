@@ -45,7 +45,7 @@ defmodule Arke.Core.Group do
   defp sync_manager(
          %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
        ) do
-    GroupManager.update(id, project, unit)
+    GroupManager.update(id, project, keep_manager_module(unit, GroupManager.get(id, project)))
     {:ok, hook}
   end
 
@@ -53,6 +53,10 @@ defmodule Arke.Core.Group do
     GroupManager.remove(unit)
     {:ok, hook}
   end
+
+  # The module is resolved once on create; a unit loaded from persistence has none.
+  defp keep_manager_module(unit, nil), do: unit
+  defp keep_manager_module(unit, %{__module__: module}), do: %{unit | __module__: module}
 
   def handle_link_init(u, p) when is_binary(u),
     do: %{id: String.to_atom(u), metadata: %{"parameter_id" => Atom.to_string(p)}}

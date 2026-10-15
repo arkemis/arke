@@ -39,7 +39,7 @@ defmodule Arke.Core.Arke do
   defp sync_manager(
          %Hook{op: :update, unit: %{id: id, metadata: %{project: project}} = unit} = hook
        ) do
-    ArkeManager.update(id, project, unit)
+    ArkeManager.update(id, project, keep_manager_state(unit, ArkeManager.get(id, project)))
     {:ok, hook}
   end
 
@@ -47,6 +47,13 @@ defmodule Arke.Core.Arke do
     ArkeManager.remove(unit)
     {:ok, hook}
   end
+
+  # The manager's parameter list is built from links and its module is resolved once on
+  # create; a unit loaded from persistence carries neither, so keep the manager's copy.
+  defp keep_manager_state(unit, nil), do: unit
+
+  defp keep_manager_state(unit, %{data: %{parameters: parameters}, __module__: module}),
+    do: %{unit | data: Map.put(unit.data, :parameters, parameters), __module__: module}
 
   def handle_link_init(u, p) when is_binary(u),
     do: %{id: String.to_atom(u), metadata: %{"parameter_id" => Atom.to_string(p)}}
