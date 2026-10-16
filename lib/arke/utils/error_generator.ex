@@ -22,7 +22,8 @@ defmodule Arke.Utils.ErrorGenerator do
 
   ## Parameters
     - context => string => the context where the error has been generated
-    - errors => list | string => the error itself
+    - errors => list | string => the error itself; a `{label, message, code}` tuple sets a per-error code
+    - opts => keyword => `code:` a stable key (e.g. for translations) added to errors without one
 
   ## Example
       iex> Arke.Utils.ErrorGenerator.create(:auth, "login error")
@@ -31,25 +32,35 @@ defmodule Arke.Utils.ErrorGenerator do
        {:error , [%{context: "context_value", message: "message_value"}, ...]}
   """
 
-  @type t() :: {:error, [%{context: String.t(), message: String.t()}]}
+  @type error() :: %{
+          required(:context) => String.t(),
+          required(:message) => String.t(),
+          optional(:code) => String.t()
+        }
+  @type t() :: {:error, [error()]}
 
-  @spec create(context :: String.t(), errors :: list() | String.t()) ::
-          {:error, [%{context: String.t(), message: String.t()}]}
-  def create(context, errors) when is_list(errors) do
-    {:error, create_map(context, errors)}
+  @spec create(context :: String.t(), errors :: list() | String.t(), opts :: keyword()) :: t()
+  def create(context, errors, opts \\ [])
+
+  def create(context, errors, opts) when is_list(errors) or is_binary(errors) do
+    {:error, context |> create_map(errors) |> put_code(opts[:code])}
   end
 
-  def create(context, errors) when is_binary(errors) do
-    {:error, create_map(context, errors)}
+  def create(context, errors, opts) when is_atom(errors) do
+    create(context, Atom.to_string(errors), opts)
   end
 
-  def create(context, errors) when is_atom(errors) do
-    {:error, create_map(context, Atom.to_string(errors))}
-  end
+  def create(_context, _errors, _opts), do: create(:error_generator, "invalid attribute format")
 
-  def create(_context, _errors), do: create(:error_generator, "invalid attribute format")
+  defp put_code(errors, nil), do: errors
+  defp put_code(errors, code), do: Enum.map(errors, &Map.put_new(&1, :code, code))
 
   defp create_map(_context, _errors, error_list \\ [])
+
+  defp create_map(context, [{message, values, code} | t], error_list) do
+    [error] = create_map(context, [{message, values}])
+    create_map(context, t, error_list ++ [Map.put(error, :code, code)])
+  end
 
   defp create_map(context, [{message, values} = _h | t] = _errors, error_list)
        when is_list(values) do
