@@ -86,21 +86,19 @@ defmodule Arke.Validator do
   defp check_duplicate_unit(%{id: unit_id} = unit, project, :create) do
     with nil <- QueryManager.get_by(%{:id => unit_id, :project => project}),
          do: {:ok, unit},
-         else: (_ -> {:error, [{"You can not create Unit with same id", unit_id}]})
+         else: (_ ->
+                  {:error,
+                   [{"You can not create Unit with same id", unit_id, "unit.duplicate_id"}]})
   end
 
   defp check_duplicate_unit(%{id: _unit_id} = unit, _project, _persistence_fn), do: {:ok, unit}
 
+  # an unchanged unique value is the unit's own, not a duplicate
   defp check_old_values(errors, old_unit_data, new_unit_data, :update) do
-    duplicate_list =
-      Enum.filter(errors, fn {k, v} ->
-        is_binary(k) and String.contains?(k, "duplicate") and is_atom(v)
-      end)
-
-    same_value =
-      Enum.filter(duplicate_list, fn {_k, v} -> old_unit_data[v] == new_unit_data[v] end)
-
-    :ordsets.subtract(errors, same_value)
+    Enum.reject(errors, fn
+      {_message, id, "parameter.unique"} -> old_unit_data[id] == new_unit_data[id]
+      _ -> false
+    end)
   end
 
   defp check_old_values(errors, _old_unit_data, _new_unit_data, :create), do: errors
@@ -124,7 +122,7 @@ defmodule Arke.Validator do
 
   ## Returns
       {value,[]} if success
-      {value,["parameter label", message ]} in case of error
+      {value, [{label, message, code}]} in case of error
   """
   @spec validate_parameter(
           arke :: Arke.t(),
@@ -218,7 +216,7 @@ defmodule Arke.Validator do
 
   defp check_required_parameter(errors, %{id: id, data: %{required: true}} = _parameter, value)
        when is_nil(value),
-       do: errors ++ [{id, "is required"}]
+       do: errors ++ [{id, "is required", "parameter.required"}]
 
   defp check_required_parameter(errors, _parameter, _value), do: errors
 
@@ -231,7 +229,7 @@ defmodule Arke.Validator do
        ) do
     with nil <- QueryManager.get_by(%{id => value, :project => project, :arke_id => arke.id}),
          do: errors,
-         else: (_ -> errors ++ [{"duplicate values are not allowed for", id}])
+         else: (_ -> errors ++ [{"duplicate values are not allowed for", id, "parameter.unique"}])
   end
 
   defp check_duplicate(errors, _parameter, _value, _project, _arke), do: errors
@@ -256,7 +254,7 @@ defmodule Arke.Validator do
   end
 
   defp check_by_type(errors, %{arke_id: :string} = parameter, _value),
-    do: errors ++ [{parameter.data.label, "must be a string"}]
+    do: errors ++ [{parameter.data.label, "must be a string", "parameter.invalid_type"}]
 
   ######################################################################
   # NUMBER PARAMETER ###################################################
@@ -272,7 +270,7 @@ defmodule Arke.Validator do
   end
 
   defp check_by_type(errors, %{arke_id: :integer, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be an integer"}]
+    do: errors ++ [{label, "must be an integer", "parameter.invalid_type"}]
 
   defp check_by_type(errors, %{arke_id: :float} = parameter, value)
        when is_number(value) or is_list(value) do
@@ -284,22 +282,22 @@ defmodule Arke.Validator do
   end
 
   defp check_by_type(errors, %{arke_id: :float, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a float"}]
+    do: errors ++ [{label, "must be a float", "parameter.invalid_type"}]
 
   defp check_by_type(_errors, %{arke_id: :dict} = _parameter, value) when is_map(value), do: []
 
   defp check_by_type(errors, %{arke_id: :dict, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a map"}]
+    do: errors ++ [{label, "must be a map", "parameter.invalid_type"}]
 
   defp check_by_type(_errors, %{arke_id: :list} = _parameter, value) when is_list(value), do: []
 
   defp check_by_type(errors, %{arke_id: :list, data: %{label: label}} = _parameter, _value),
-    do: errors ++ [{label, "must be a list"}]
+    do: errors ++ [{label, "must be a list", "parameter.invalid_type"}]
 
   defp check_by_type(errors, %{arke_id: :date} = parameter, value) do
     case DatetimeHandler.parse_date(value) do
       {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+      {:error, msg} -> errors ++ [{parameter.data.label, msg, "parameter.invalid_type"}]
     end
   end
 
@@ -308,7 +306,7 @@ defmodule Arke.Validator do
   defp check_by_type(errors, %{arke_id: :time} = parameter, value) do
     case DatetimeHandler.parse_time(value) do
       {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+      {:error, msg} -> errors ++ [{parameter.data.label, msg, "parameter.invalid_type"}]
     end
   end
 
@@ -317,7 +315,7 @@ defmodule Arke.Validator do
   defp check_by_type(errors, %{arke_id: :datetime} = parameter, value) do
     case DatetimeHandler.parse_datetime(value) do
       {:ok, _date} -> errors
-      {:error, msg} -> errors ++ [{parameter.data.label, msg}]
+      {:error, msg} -> errors ++ [{parameter.data.label, msg, "parameter.invalid_type"}]
     end
   end
 
@@ -330,7 +328,7 @@ defmodule Arke.Validator do
        do: errors
 
   defp check_by_type(errors, %{arke_id: :boolean} = parameter, _value),
-    do: errors ++ [{parameter.data.label, "must be a boolean"}]
+    do: errors ++ [{parameter.data.label, "must be a boolean", "parameter.invalid_type"}]
 
   ######################################################################
   # ARKE LINK PARAMETER ################################################
@@ -369,7 +367,9 @@ defmodule Arke.Validator do
         _ -> __enum_error_common__(errors, parameter)
       end
     else
-      _ -> errors ++ [{value, "#{label} must be a list of #{to_string(type)}"}]
+      _ ->
+        errors ++
+          [{value, "#{label} must be a list of #{to_string(type)}", "parameter.invalid_type"}]
     end
   end
 
@@ -385,7 +385,7 @@ defmodule Arke.Validator do
          %{arke_id: type, data: %{multiple: true, values: _values, label: label}} = _parameter,
          value
        ),
-       do: errors ++ [{value, "#{label} must be a list of #{type}}"}]
+       do: errors ++ [{value, "#{label} must be a list of #{type}}", "parameter.invalid_type"}]
 
   defp check_values(errors, _parameter, _value), do: errors
 
@@ -404,7 +404,8 @@ defmodule Arke.Validator do
   # --- start Multiple ---
   defp check_multiple(errors, %{id: id, data: %{multiple: false}} = _parameter, value)
        when is_list(value),
-       do: errors ++ [{"multiple values are not allowed for", id}]
+       do:
+         errors ++ [{"multiple values are not allowed for", id, "parameter.multiple_not_allowed"}]
 
   defp check_multiple(errors, %{id: _id, data: %{multiple: true}} = parameter, value)
        when not is_list(value),
@@ -420,7 +421,11 @@ defmodule Arke.Validator do
         errors
 
       false ->
-        errors ++ [{"[#{Enum.join(value, ",")}]", "#{id} must be a list of #{type} "}]
+        errors ++
+          [
+            {"[#{Enum.join(value, ",")}]", "#{id} must be a list of #{type} ",
+             "parameter.invalid_type"}
+          ]
     end
   end
 
@@ -469,7 +474,7 @@ defmodule Arke.Validator do
     max = parse_value(%{arke_id: :integer, data: %{multiple: false}}, max_length)
 
     if String.length(value) > max do
-      errors ++ [{label, "max length is #{max_length}"}]
+      errors ++ [{label, "max length is #{max_length}", "parameter.max_length"}]
     else
       errors
     end
@@ -488,7 +493,7 @@ defmodule Arke.Validator do
     min = parse_value(%{arke_id: :integer, data: %{multiple: false}}, min_length)
 
     if String.length(value) < min do
-      errors ++ [{label, "min length is #{min_length}"}]
+      errors ++ [{label, "min length is #{min_length}", "parameter.min_length"}]
     else
       errors
     end
@@ -504,7 +509,7 @@ defmodule Arke.Validator do
     parsed_max = parse_value(parameter, max)
 
     if value > parsed_max do
-      errors ++ [{label, "max is #{max}"}]
+      errors ++ [{label, "max is #{max}", "parameter.max"}]
     else
       errors
     end
@@ -516,7 +521,7 @@ defmodule Arke.Validator do
     parsed_min = parse_value(parameter, min)
 
     if value < parsed_min do
-      errors ++ [{label, "min is #{min}"}]
+      errors ++ [{label, "min is #{min}", "parameter.min"}]
     else
       errors
     end
@@ -529,6 +534,9 @@ defmodule Arke.Validator do
 
   defp __enum_error_common__(errors, %{id: id, data: %{values: values}} = _parameter) do
     errors ++
-      [{"allowed values for #{id} are", Enum.map(values, fn %{label: _l, value: v} -> v end)}]
+      [
+        {"allowed values for #{id} are", Enum.map(values, fn %{label: _l, value: v} -> v end),
+         "parameter.not_allowed_value"}
+      ]
   end
 end

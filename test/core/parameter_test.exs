@@ -105,7 +105,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First string unit"
         })
 
-      assert msg == [%{context: "parameter_validation", message: "Test String: max length is 5"}]
+      assert msg == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test String: max length is 5",
+                 code: "parameter.max_length"
+               }
+             ]
 
       {:error, msg} =
         QueryManager.create(:test_schema, arke_model, %{
@@ -113,7 +119,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First string unit"
         })
 
-      assert msg == [%{context: "parameter_validation", message: "Test String: min length is 3"}]
+      assert msg == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test String: min length is 3",
+                 code: "parameter.min_length"
+               }
+             ]
     end
 
     test "values" do
@@ -156,7 +168,8 @@ defmodule Arke.Core.ParameterTest do
       assert msg == [
                %{
                  context: "parameter_validation",
-                 message: "allowed values for string_test_values are: first, second"
+                 message: "allowed values for string_test_values are: first, second",
+                 code: "parameter.not_allowed_value"
                }
              ]
     end
@@ -243,7 +256,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First integer unit"
         })
 
-      assert unit == [%{context: "parameter_validation", message: "Test Integer: max is 5"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test Integer: max is 5",
+                 code: "parameter.max"
+               }
+             ]
 
       {:error, unit} =
         QueryManager.create(:test_schema, arke_model, %{
@@ -251,7 +270,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First integer unit"
         })
 
-      assert unit == [%{context: "parameter_validation", message: "Test Integer: min is 3"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test Integer: min is 3",
+                 code: "parameter.min"
+               }
+             ]
     end
 
     test "values" do
@@ -302,7 +327,8 @@ defmodule Arke.Core.ParameterTest do
       assert msg == [
                %{
                  context: "parameter_validation",
-                 message: "allowed values for integer_test_values are: 1, 2, 3, 4"
+                 message: "allowed values for integer_test_values are: 1, 2, 3, 4",
+                 code: "parameter.not_allowed_value"
                }
              ]
     end
@@ -377,12 +403,24 @@ defmodule Arke.Core.ParameterTest do
       {:error, unit} =
         QueryManager.create(:test_schema, arke_model, %{float_test: 10, label: "First float unit"})
 
-      assert unit == [%{context: "parameter_validation", message: "Test float: max is 5"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test float: max is 5",
+                 code: "parameter.max"
+               }
+             ]
 
       {:error, unit} =
         QueryManager.create(:test_schema, arke_model, %{float_test: 1, label: "First float unit"})
 
-      assert unit == [%{context: "parameter_validation", message: "Test float: min is 3"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test float: min is 3",
+                 code: "parameter.min"
+               }
+             ]
     end
 
     test "values" do
@@ -428,7 +466,8 @@ defmodule Arke.Core.ParameterTest do
       assert msg == [
                %{
                  context: "parameter_validation",
-                 message: "allowed values for float_test_values are: 1, 2, 3, 4"
+                 message: "allowed values for float_test_values are: 1, 2, 3, 4",
+                 code: "parameter.not_allowed_value"
                }
              ]
     end
@@ -505,7 +544,11 @@ defmodule Arke.Core.ParameterTest do
         })
 
       assert unit == [
-               %{context: "parameter_validation", message: "Test boolean: must be a boolean"}
+               %{
+                 context: "parameter_validation",
+                 message: "Test boolean: must be a boolean",
+                 code: "parameter.invalid_type"
+               }
              ]
     end
 
@@ -581,7 +624,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First dict unit"
         })
 
-      assert unit == [%{context: "parameter_validation", message: "Test dict: must be a map"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test dict: must be a map",
+                 code: "parameter.invalid_type"
+               }
+             ]
     end
 
     test "delete" do
@@ -658,7 +707,13 @@ defmodule Arke.Core.ParameterTest do
           label: "First list unit"
         })
 
-      assert unit == [%{context: "parameter_validation", message: "Test list: must be a list"}]
+      assert unit == [
+               %{
+                 context: "parameter_validation",
+                 message: "Test list: must be a list",
+                 code: "parameter.invalid_type"
+               }
+             ]
     end
 
     test "delete" do
@@ -762,7 +817,8 @@ defmodule Arke.Core.ParameterTest do
                %{
                  context: "parameter_validation",
                  message:
-                   "Test date: must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format"
+                   "Test date: must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format",
+                 code: "parameter.invalid_type"
                }
              ]
     end
@@ -868,7 +924,8 @@ defmodule Arke.Core.ParameterTest do
                %{
                  context: "parameter_validation",
                  message:
-                   "Test time: must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format"
+                   "Test time: must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format",
+                 code: "parameter.invalid_type"
                }
              ]
     end
@@ -980,7 +1037,8 @@ defmodule Arke.Core.ParameterTest do
                %{
                  context: "parameter_validation",
                  message:
-                   "Test datetime: must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"
+                   "Test datetime: must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format",
+                 code: "parameter.invalid_type"
                }
              ]
     end

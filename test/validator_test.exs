@@ -48,7 +48,7 @@ defmodule Arke.ValidatorTest do
       arke = ArkeManager.get(:arke, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke, :label, 12, :arke_system) ==
-               {12, [{"Label", "must be a string"}]}
+               {12, [{"Label", "must be a string", "parameter.invalid_type"}]}
     end
 
     test "string" do
@@ -68,7 +68,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:name, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_string, parameter, 12, :test_schema) ==
-               {12, [{"Name", "must be a string"}]}
+               {12, [{"Name", "must be a string", "parameter.invalid_type"}]}
     end
 
     test "integer" do
@@ -84,7 +84,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:default_integer, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_integer, parameter, "not_valid", :test_schema) ==
-               {"not_valid", [{"Default", "must be an integer"}]}
+               {"not_valid", [{"Default", "must be an integer", "parameter.invalid_type"}]}
     end
 
     test "float" do
@@ -98,7 +98,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:default_float, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_float, parameter, "not_valid", :test_schema) ==
-               {"not_valid", [{"Default", "must be a float"}]}
+               {"not_valid", [{"Default", "must be a float", "parameter.invalid_type"}]}
     end
 
     test "boolean" do
@@ -114,7 +114,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:default_boolean, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_boolean, parameter, "not_valid", :test_schema) ==
-               {"not_valid", [{"Default", "must be a boolean"}]}
+               {"not_valid", [{"Default", "must be a boolean", "parameter.invalid_type"}]}
     end
 
     test "dict" do
@@ -134,7 +134,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:default_dict, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_dict, parameter, "not_valid", :test_schema) ==
-               {"not_valid", [{"Default", "must be a map"}]}
+               {"not_valid", [{"Default", "must be a map", "parameter.invalid_type"}]}
     end
 
     test "list" do
@@ -154,7 +154,7 @@ defmodule Arke.ValidatorTest do
       parameter = ParameterManager.get(:default_list, :arke_system)
 
       assert Arke.Validator.validate_parameter(arke_list, parameter, "not_valid", :test_schema) ==
-               {"not_valid", [{"Default", "must be a list"}]}
+               {"not_valid", [{"Default", "must be a list", "parameter.invalid_type"}]}
     end
 
     test "enum" do
@@ -270,7 +270,10 @@ defmodule Arke.ValidatorTest do
                  :test_schema
                ) ==
                  {"not_valid",
-                  [{"allowed values for test_enum_string are", ["value1", "value2"]}]}
+                  [
+                    {"allowed values for test_enum_string are", ["value1", "value2"],
+                     "parameter.not_allowed_value"}
+                  ]}
       end
     end
 
@@ -288,7 +291,11 @@ defmodule Arke.ValidatorTest do
         parameter_integer = ParameterManager.get(:test_enum_integer, :test_schema)
 
         assert Arke.Validator.validate_parameter(arke_integer, parameter_integer, 4, :test_schema) ==
-                 {4, [{"allowed values for test_enum_integer are", [1, 2]}]}
+                 {4,
+                  [
+                    {"allowed values for test_enum_integer are", [1, 2],
+                     "parameter.not_allowed_value"}
+                  ]}
       end
     end
 
@@ -306,7 +313,11 @@ defmodule Arke.ValidatorTest do
         parameter_float = ParameterManager.get(:test_enum_float, :test_schema)
 
         assert Arke.Validator.validate_parameter(arke_float, parameter_float, 0.5, :test_schema) ==
-                 {0.5, [{"allowed values for test_enum_float are", [1.4, 2.6]}]}
+                 {0.5,
+                  [
+                    {"allowed values for test_enum_float are", [1.4, 2.6],
+                     "parameter.not_allowed_value"}
+                  ]}
       end
     end
 
@@ -360,7 +371,10 @@ defmodule Arke.ValidatorTest do
 
       assert Arke.Validator.validate_parameter(arke_date, parameter, "01/01/2020", :test_schema) ==
                {"01/01/2020",
-                [{"Default", "must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format"}]}
+                [
+                  {"Default", "must be %Date{} | ~D[YYYY-MM-DD] | iso8601 (YYYY-MM-DD) format",
+                   "parameter.invalid_type"}
+                ]}
     end
 
     test "date (sigil ~D)" do
@@ -394,7 +408,10 @@ defmodule Arke.ValidatorTest do
       # TODO: must return message
       assert Arke.Validator.validate_parameter(arke_time, parameter, 9, :test_schema) ==
                {9,
-                [{"Default", "must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format"}]}
+                [
+                  {"Default", "must be must be %Time{} |~T[HH:MM:SS] | iso8601 (HH:MM:SS) format",
+                   "parameter.invalid_type"}
+                ]}
     end
 
     test "time (sigil ~T)" do
@@ -446,7 +463,8 @@ defmodule Arke.ValidatorTest do
                {"01/01/2020",
                 [
                   {"Default",
-                   "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format"}
+                   "must be %DateTime{} | %NaiveDatetime{} | ~N[YYYY-MM-DDTHH:MM:SS] | ~N[YYYY-MM-DD HH:MM:SS] | ~U[YYYY-MM-DD HH:MM:SS]  format",
+                   "parameter.invalid_type"}
                 ]}
     end
 
@@ -505,7 +523,9 @@ defmodule Arke.ValidatorTest do
                :string_support,
                "unique_username",
                :test_schema
-             ) == {"unique_username", [{"duplicate values are not allowed for", :string_support}]}
+             ) ==
+               {"unique_username",
+                [{"duplicate values are not allowed for", :string_support, "parameter.unique"}]}
     end
   end
 
@@ -571,7 +591,9 @@ defmodule Arke.ValidatorTest do
                :string_test_default,
                "Max length exceeded",
                :test_schema
-             ) == {"Max length exceeded", [{"Test String", "max length is 10"}]}
+             ) ==
+               {"Max length exceeded",
+                [{"Test String", "max length is 10", "parameter.max_length"}]}
 
       assert Arke.Validator.validate_parameter(arke, :string_test_default, nil, :test_schema) ==
                {"Default", []}
@@ -634,7 +656,7 @@ defmodule Arke.ValidatorTest do
       assert param.metadata.project == parameter_integer.metadata.project
 
       assert Arke.Validator.validate_parameter(arke, :integer, 11, :test_schema) ==
-               {11, [{"Test Integer", "max is 10"}]}
+               {11, [{"Test Integer", "max is 10", "parameter.max"}]}
 
       assert Arke.Validator.validate_parameter(arke, :integer, nil, :test_schema) == {4, []}
     end
@@ -700,10 +722,14 @@ defmodule Arke.ValidatorTest do
       assert param.metadata.project == parameter_float.metadata.project
 
       assert Arke.Validator.validate_parameter(arke, :float, nil, :test_schema) ==
-               {nil, [{:float, "is required"}]}
+               {nil, [{:float, "is required", "parameter.required"}]}
 
       assert Arke.Validator.validate_parameter(arke, :float, 12.35, :test_schema) ==
-               {12.35, [{"allowed values for float are", [3.67, 4.5, 9.08]}]}
+               {12.35,
+                [
+                  {"allowed values for float are", [3.67, 4.5, 9.08],
+                   "parameter.not_allowed_value"}
+                ]}
     end
   end
 end

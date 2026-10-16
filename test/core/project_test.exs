@@ -27,7 +27,15 @@ defmodule Arke.Core.ProjectTest do
                name: "invalid_project",
                description: "invalid project",
                type: "postgres_schema"
-             }) == {:error, [%{context: "parameter_validation", message: "label: is required"}]}
+             }) ==
+               {:error,
+                [
+                  %{
+                    context: "parameter_validation",
+                    message: "label: is required",
+                    code: "parameter.required"
+                  }
+                ]}
     end
 
     test "delete" do

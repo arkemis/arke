@@ -43,4 +43,58 @@ defmodule Arke.Utils.ErrorGeneratorTest do
     assert Arke.Utils.ErrorGenerator.create(:test, errors) ==
              {:error, [%{context: "error_generator", message: "invalid attribute format"}]}
   end
+
+  describe "code" do
+    test "is absent unless given" do
+      {:error, [error]} = Arke.Utils.ErrorGenerator.create(:test, "boom")
+      refute Map.has_key?(error, :code)
+    end
+
+    test "from opts, on every error" do
+      assert Arke.Utils.ErrorGenerator.create(:test, ["a", "b"], code: "test.boom") ==
+               {:error,
+                [
+                  %{context: "test", message: "a", code: "test.boom"},
+                  %{context: "test", message: "b", code: "test.boom"}
+                ]}
+
+      assert Arke.Utils.ErrorGenerator.create(:test, :boom, code: "test.boom") ==
+               {:error, [%{context: "test", message: "boom", code: "test.boom"}]}
+    end
+
+    test "from a 3-tuple, per error" do
+      errors = [
+        {"Max", "must be an integer", "parameter.invalid_type"},
+        {"allowed values for type are", ["a", "b"], "parameter.not_allowed_value"},
+        {"Label", "is required"}
+      ]
+
+      assert Arke.Utils.ErrorGenerator.create(:test, errors) ==
+               {:error,
+                [
+                  %{
+                    context: "test",
+                    message: "Max: must be an integer",
+                    code: "parameter.invalid_type"
+                  },
+                  %{
+                    context: "test",
+                    message: "allowed values for type are: a, b",
+                    code: "parameter.not_allowed_value"
+                  },
+                  %{context: "test", message: "Label: is required"}
+                ]}
+    end
+
+    test "a 3-tuple code wins over opts" do
+      assert Arke.Utils.ErrorGenerator.create(:test, [{"Max", "too big", "own"}, "plain"],
+               code: "default"
+             ) ==
+               {:error,
+                [
+                  %{context: "test", message: "Max: too big", code: "own"},
+                  %{context: "test", message: "plain", code: "default"}
+                ]}
+    end
+  end
 end
