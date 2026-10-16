@@ -124,13 +124,12 @@ defmodule Mix.Tasks.Arke.SeedProject do
     core_registry = arke_registry("arke", format, "all")
     core_data = parse(core_registry, format)
 
-    arke_deps_registry = get_arke_deps_registry(format, "all")
-    arke_deps_data = parse(arke_deps_registry, format)
+    all_data = core_registry_data(format)
     Mix.shell().info("--- Get core data ---")
-    core_parameter = Map.get(core_data, :parameter, []) ++ Map.get(arke_deps_data, :parameter, [])
-    core_arke = Map.get(core_data, :arke, []) ++ Map.get(arke_deps_data, :arke, [])
-    core_group = Map.get(core_data, :group, []) ++ Map.get(arke_deps_data, :group, [])
-    core_link = Map.get(core_data, :link, []) ++ Map.get(arke_deps_data, :link, [])
+    core_parameter = Map.get(all_data, :parameter, [])
+    core_arke = Map.get(all_data, :arke, [])
+    core_group = Map.get(all_data, :group, [])
+    core_link = Map.get(all_data, :link, [])
 
     # start core manager before create everything
     Mix.shell().info("--- Starting core managers --- ")
@@ -232,9 +231,20 @@ defmodule Mix.Tasks.Arke.SeedProject do
         "Invalid format: `#{format}`\nSupported format are: #{Enum.join(@supported_format, " | ")}"
       )
 
+  # arke and arke deps registries in one parse, so files found by both lookups count once
+  @doc false
+  def core_registry_data(format, deps \\ Mix.Project.config() |> Keyword.get(:deps, [])) do
+    files = arke_registry("arke", format, "all") ++ get_arke_deps_registry(format, "all", deps)
+    parse(Enum.uniq(files), format)
+  end
+
   # get all the registry file for all the arke_deps except arke itself which is used alone
-  defp get_arke_deps_registry(format, type) do
-    Enum.reduce(Mix.Project.config() |> Keyword.get(:deps, []), [], fn tuple, acc ->
+  defp get_arke_deps_registry(
+         format,
+         type,
+         deps \\ Mix.Project.config() |> Keyword.get(:deps, [])
+       ) do
+    Enum.reduce(deps, [], fn tuple, acc ->
       name = List.first(Tuple.to_list(tuple))
 
       if name != :arke and String.contains?(to_string(name), "arke") do
