@@ -107,7 +107,7 @@ jobs:
     steps:
       - name: Mint changelog token
         id: changelog_token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.CHANGELOG_APP_ID }}
           private-key: ${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}
@@ -117,7 +117,7 @@ jobs:
           token: ${{ steps.changelog_token.outputs.token }}
       - name: Generate release notes
         id: release_notes
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
         with:
           config: cliff.toml
           args: --verbose --latest --strip header
@@ -128,7 +128,7 @@ jobs:
         with:
           body: ${{ steps.release_notes.outputs.content }}
       - name: Generate changelog
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
         with:
           config: cliff.toml
           args: --verbose
