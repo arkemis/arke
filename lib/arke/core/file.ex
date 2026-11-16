@@ -20,6 +20,7 @@ defmodule Arke.Core.File do
   use Arke.System
 
   alias Arke.Boundary.{ArkeManager, FileManager}
+  alias Arke.Utils.ErrorGenerator, as: Error
 
   def file_storage_module(), do: Application.get_env(:arke, :file_storage_module, Arke.Utils.Gcp)
 
@@ -31,26 +32,36 @@ defmodule Arke.Core.File do
     {:ok, unit}
   end
 
+  # Only a %Plug.Upload{} (built by Plug from a multipart request, never from
+  # decoded request data) may point the file at a path on the server disk. A
+  # plain map with the same keys can come from a request body, so it is refused:
+  # reading its `path` would expose any file the server can read.
+  # Plug is not a dependency of arke, hence the struct is matched by name.
   def before_load(
-        %{path: path, content_type: content_type, filename: filename} = _unit,
+        %{__struct__: Plug.Upload, path: path, content_type: _content_type, filename: filename} =
+          _unit,
         :create
-      ) do
-    {:ok, file_stat} = File.stat(path)
-    extension = Path.extname(filename)
-    {:ok, binary} = File.read(path)
-    path = "arke_file/#{DateTime.to_string(DateTime.utc_now())}"
+      )
+      when is_binary(path) and is_binary(filename) do
+    with {:ok, file_stat} <- File.stat(path),
+         {:ok, binary} <- File.read(path) do
+      unit_data = %{
+        binary_data: binary,
+        extension: Path.extname(filename),
+        size: file_stat.size,
+        provider: "gcloud",
+        path: "arke_file/#{DateTime.to_string(DateTime.utc_now())}",
+        name: filename
+      }
 
-    unit_data = %{
-      binary_data: binary,
-      extension: extension,
-      size: file_stat.size,
-      provider: "gcloud",
-      path: path,
-      name: filename
-    }
-
-    {:ok, unit_data}
+      {:ok, unit_data}
+    else
+      {:error, _reason} -> Error.create(:arke_file, "cannot read the uploaded file")
+    end
   end
+
+  def before_load(%{path: _, content_type: _, filename: _}, :create),
+    do: Error.create(:arke_file, "a file can only be created from an upload")
 
   def before_load(opts, _persistence_fn), do: {:ok, opts}
 
