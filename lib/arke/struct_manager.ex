@@ -22,7 +22,7 @@ defmodule Arke.StructManager do
   alias Arke.Boundary.ArkeManager
   alias Arke.QueryManager
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
-  alias Arke.Core.{Unit, Arke}
+  alias Arke.Core.{Unit, Arke, Query}
 
   @type parameter :: %{
           default: String.t() | boolean() | atom() | map() | list() | nil,
@@ -123,7 +123,33 @@ defmodule Arke.StructManager do
 
   defp get_link_units(id_list, project, opts) do
     QueryManager.filter_by(id__in: id_list, project: project)
+    |> apply_link_query(project, Keyword.get(opts, :link_query))
     |> Enum.map(fn unit -> encode(unit, opts) end)
+  end
+
+  # Without a `:link_query` option every linked unit is expanded, as before.
+  # Callers that encode for a client (e.g. arke_server) must pass one, so that
+  # `load_links` only expands units the client may read:
+  #
+  #     link_query: fn query, arke_id -> query_with_permission_filter | :deny end
+  #
+  # It is called once per arke of the linked units with a query already scoped
+  # to that arke and to the linked ids; the units it returns are the ones kept.
+  defp apply_link_query(units, _project, nil), do: units
+
+  defp apply_link_query(units, project, link_query) when is_function(link_query, 2) do
+    units
+    |> Enum.group_by(& &1.arke_id, &to_string(&1.id))
+    |> Enum.flat_map(fn {arke_id, ids} ->
+      query =
+        QueryManager.query(project: project, arke: arke_id)
+        |> QueryManager.where(id__in: ids)
+
+      case link_query.(query, arke_id) do
+        %Query{} = query -> QueryManager.all(query)
+        _deny -> []
+      end
+    end)
   end
 
   defp get_link_id_list(units) when is_list(units) do

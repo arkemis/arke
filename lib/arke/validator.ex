@@ -16,7 +16,7 @@ defmodule Arke.Validator do
   @moduledoc """
   This module provide validation before assign a certain value to an `{arke_struct}`
   """
-  alias Arke.Boundary.{ArkeManager, ParameterManager}
+  alias Arke.Boundary.{ArkeManager, GroupManager, ParameterManager}
   alias Arke.QueryManager, as: QueryManager
   alias Arke.Utils.ErrorGenerator, as: Error
   alias Arke.Utils.DatetimeHandler, as: DatetimeHandler
@@ -159,6 +159,7 @@ defmodule Arke.Validator do
       |> check_required_parameter(parameter, value)
       |> check_by_type(parameter, value)
       |> check_duplicate(parameter, value, project,arke)
+      |> check_link_target(parameter, value, project)
 
     {value, errors}
   end
@@ -231,6 +232,70 @@ defmodule Arke.Validator do
   end
 
   defp check_duplicate(errors, _parameter, _value, _project,_arke), do: errors
+
+  ######################################################################
+  # LINK TARGET ########################################################
+  ######################################################################
+
+  # Link targets that are schema definitions (arkes, parameters, groups) are
+  # not data units of the project, so they are not looked up here.
+  @schema_link_targets ~w(arke parameter group arke_or_group)
+
+  # A link parameter must not point at a unit of another arke than the one
+  # (or the arkes of the group) it is declared for. Otherwise a client could
+  # link any unit id, e.g. an OTP, and read it back through `load_links`.
+  # Ids with no unit behind them are left alone: they expand to nothing, and
+  # rejecting them would block updates of units whose link target was deleted.
+  # Maps are units created along with this one and are validated by their own
+  # create.
+  defp check_link_target(
+         errors,
+         %{arke_id: :link, id: id, data: %{arke_or_group_id: target}} = _parameter,
+         value,
+         project
+       )
+       when not is_nil(value) and not is_nil(target) do
+    with ids when ids != [] <- link_ids(value),
+         allowed when is_list(allowed) <- allowed_link_arkes(to_string(target), project) do
+      found =
+        QueryManager.filter_by(project: project, id__in: ids)
+        |> Map.new(fn unit -> {to_string(unit.id), to_string(unit.arke_id)} end)
+
+      invalid =
+        Enum.filter(ids, fn link_id ->
+          Map.has_key?(found, link_id) and Map.get(found, link_id) not in allowed
+        end)
+
+      case invalid do
+        [] -> errors
+        invalid -> errors ++ [{"invalid link for #{id}", invalid}]
+      end
+    else
+      _ -> errors
+    end
+  end
+
+  defp check_link_target(errors, _parameter, _value, _project), do: errors
+
+  defp link_ids(value) when is_list(value), do: Enum.flat_map(value, &link_ids/1)
+  defp link_ids(value) when is_binary(value), do: [value]
+  defp link_ids(value) when is_atom(value), do: [Atom.to_string(value)]
+  defp link_ids(_value), do: []
+
+  defp allowed_link_arkes(target, _project) when target in @schema_link_targets, do: :skip
+
+  defp allowed_link_arkes(target, project) do
+    case ArkeManager.get(target, project) do
+      %{id: arke_id} ->
+        [to_string(arke_id)]
+
+      nil ->
+        case GroupManager.get(target, project) do
+          %{data: %{arke_list: arke_list}} -> Enum.map(arke_list, &to_string(&1.id))
+          _ -> :skip
+        end
+    end
+  end
 
   defp check_by_type(errors, _parameter, value) when is_nil(value), do: errors
 
